@@ -43,7 +43,6 @@ import (
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
-	"github.com/openkruise/kruise/pkg/webhook"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -164,31 +163,35 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("setup webhook")
-	if err = webhook.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to setup webhook")
-		os.Exit(1)
-	}
-
-	// +kubebuilder:scaffold:builder
-	setupLog.Info("initialize webhook")
-	if err := webhook.Initialize(ctx, cfg); err != nil {
-		setupLog.Error(err, "unable to initialize webhook")
-		os.Exit(1)
-	}
-
-	if err := mgr.AddReadyzCheck("webhook-ready", webhook.Checker); err != nil {
-		setupLog.Error(err, "unable to add readyz check")
-		os.Exit(1)
-	}
-
-	go func() {
-		setupLog.Info("wait webhook ready")
-		if err = webhook.WaitReady(); err != nil {
-			setupLog.Error(err, "unable to wait webhook ready")
+	/*
+		setupLog.Info("setup webhook")
+		if err = webhook.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to setup webhook")
 			os.Exit(1)
 		}
 
+
+			// +kubebuilder:scaffold:builder
+			setupLog.Info("initialize webhook")
+			if err := webhook.Initialize(ctx, cfg); err != nil {
+				setupLog.Error(err, "unable to initialize webhook")
+				os.Exit(1)
+			}
+
+			if err := mgr.AddReadyzCheck("webhook-ready", webhook.Checker); err != nil {
+				setupLog.Error(err, "unable to add readyz check")
+				os.Exit(1)
+			}
+	*/
+
+	go func() {
+		/*
+			setupLog.Info("wait webhook ready")
+			if err = webhook.WaitReady(); err != nil {
+				setupLog.Error(err, "unable to wait webhook ready")
+				os.Exit(1)
+			}
+		*/
 		setupLog.Info("setup controllers")
 		if err = controller.SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to setup controllers")

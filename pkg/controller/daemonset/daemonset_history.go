@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,7 +34,7 @@ import (
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
-func (dsc *ReconcileDaemonSet) constructHistory(ds *appsv1alpha1.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
+func (dsc *ReconcileDaemonSet) constructHistory(ds *apps.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
 	var histories []*apps.ControllerRevision
 	var currentHistories []*apps.ControllerRevision
 	histories, err = dsc.controlledHistories(ds)
@@ -48,10 +47,12 @@ func (dsc *ReconcileDaemonSet) constructHistory(ds *appsv1alpha1.DaemonSet) (cur
 		if _, ok := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; !ok {
 			toUpdate := history.DeepCopy()
 			toUpdate.Labels[apps.DefaultDaemonSetUniqueLabelKey] = toUpdate.Name
+
 			history, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Update(context.TODO(), toUpdate, metav1.UpdateOptions{})
 			if err != nil {
 				return nil, nil, err
 			}
+
 		}
 		// Compare histories with ds to separate cur and old history
 		found := false
@@ -83,10 +84,12 @@ func (dsc *ReconcileDaemonSet) constructHistory(ds *appsv1alpha1.DaemonSet) (cur
 		if cur.Revision < currRevision {
 			toUpdate := cur.DeepCopy()
 			toUpdate.Revision = currRevision
+
 			_, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Update(context.TODO(), toUpdate, metav1.UpdateOptions{})
 			if err != nil {
 				return nil, nil, err
 			}
+
 		}
 	}
 	return cur, old, err
@@ -96,7 +99,7 @@ func (dsc *ReconcileDaemonSet) constructHistory(ds *appsv1alpha1.DaemonSet) (cur
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned histories are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
-func (dsc *ReconcileDaemonSet) controlledHistories(ds *appsv1alpha1.DaemonSet) ([]*apps.ControllerRevision, error) {
+func (dsc *ReconcileDaemonSet) controlledHistories(ds *apps.DaemonSet) ([]*apps.ControllerRevision, error) {
 	selector, err := util.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -126,7 +129,7 @@ func (dsc *ReconcileDaemonSet) controlledHistories(ds *appsv1alpha1.DaemonSet) (
 }
 
 // Match check if the given DaemonSet's template matches the template stored in the given history.
-func Match(ds *appsv1alpha1.DaemonSet, history *apps.ControllerRevision) (bool, error) {
+func Match(ds *apps.DaemonSet, history *apps.ControllerRevision) (bool, error) {
 	patch, err := getPatch(ds)
 	if err != nil {
 		return false, err
@@ -138,7 +141,7 @@ func Match(ds *appsv1alpha1.DaemonSet, history *apps.ControllerRevision) (bool, 
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
-func getPatch(ds *appsv1alpha1.DaemonSet) ([]byte, error) {
+func getPatch(ds *apps.DaemonSet) ([]byte, error) {
 	dsBytes, err := json.Marshal(ds)
 	if err != nil {
 		return nil, err
@@ -172,7 +175,7 @@ func maxRevision(histories []*apps.ControllerRevision) int64 {
 	return max
 }
 
-func (dsc *ReconcileDaemonSet) snapshot(ds *appsv1alpha1.DaemonSet, revision int64) (*apps.ControllerRevision, error) {
+func (dsc *ReconcileDaemonSet) snapshot(ds *apps.DaemonSet, revision int64) (*apps.ControllerRevision, error) {
 	patch, err := getPatch(ds)
 	if err != nil {
 		return nil, err
@@ -231,7 +234,7 @@ func (dsc *ReconcileDaemonSet) snapshot(ds *appsv1alpha1.DaemonSet, revision int
 	return history, err
 }
 
-func (dsc *ReconcileDaemonSet) dedupCurHistories(ds *appsv1alpha1.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
+func (dsc *ReconcileDaemonSet) dedupCurHistories(ds *apps.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	if len(curHistories) == 1 {
 		return curHistories[0], nil
 	}

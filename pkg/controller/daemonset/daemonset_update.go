@@ -24,7 +24,6 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
-	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +37,7 @@ import (
 
 // rollingUpdate identifies the set of old pods to in-place update, delete, or additional pods to create on nodes,
 // remaining within the constraints imposed by the update strategy.
-func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, curRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) error {
+func (dsc *ReconcileDaemonSet) rollingUpdate(ds *apps.DaemonSet, nodeList []*corev1.Node, curRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) error {
 	hash := curRevision.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
@@ -135,13 +134,14 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, nodeLis
 		oldPodsToDelete := append(allowedReplacementPods, candidatePodsToDelete[:remainingUnavailable]...)
 
 		// Advanced: update pods in-place first and still delete the others
-		if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
-			oldPodsToDelete, err = dsc.inPlaceUpdatePods(ds, oldPodsToDelete, curRevision, oldRevisions)
-			if err != nil {
-				return err
+		/*
+			if ds.Spec.UpdateStrategy.RollingUpdate.Type == appsv1alpha1.InplaceRollingUpdateType {
+				oldPodsToDelete, err = dsc.inPlaceUpdatePods(nil, oldPodsToDelete, curRevision, oldRevisions)
+				if err != nil {
+					return err
+				}
 			}
-		}
-
+		*/
 		return dsc.syncNodes(ds, oldPodsToDelete, nil, hash)
 	}
 
@@ -229,7 +229,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ds *appsv1alpha1.DaemonSet, nodeLis
 
 // updatedDesiredNodeCounts calculates the true number of allowed unavailable or surge pods and
 // updates the nodeToDaemonPods array to include an empty array for every node that is not scheduled.
-func (dsc *ReconcileDaemonSet) updatedDesiredNodeCounts(ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, nodeToDaemonPods map[string][]*corev1.Pod) (int, int, error) {
+func (dsc *ReconcileDaemonSet) updatedDesiredNodeCounts(ds *apps.DaemonSet, nodeList []*corev1.Node, nodeToDaemonPods map[string][]*corev1.Pod) (int, int, error) {
 	var desiredNumberScheduled int
 	for i := range nodeList {
 		node := nodeList[i]
@@ -244,7 +244,7 @@ func (dsc *ReconcileDaemonSet) updatedDesiredNodeCounts(ds *appsv1alpha1.DaemonS
 		}
 	}
 
-	maxUnavailable, err := unavailableCount(ds, desiredNumberScheduled)
+	maxUnavailable, err := unavailableCount(nil, desiredNumberScheduled)
 	if err != nil {
 		return -1, -1, fmt.Errorf("invalid value for MaxUnavailable: %v", err)
 	}
@@ -264,7 +264,7 @@ func (dsc *ReconcileDaemonSet) updatedDesiredNodeCounts(ds *appsv1alpha1.DaemonS
 	return maxSurge, maxUnavailable, nil
 }
 
-func GetTemplateGeneration(ds *appsv1alpha1.DaemonSet) (*int64, error) {
+func GetTemplateGeneration(ds *apps.DaemonSet) (*int64, error) {
 	annotation, found := ds.Annotations[apps.DeprecatedTemplateGeneration]
 	if !found {
 		return nil, nil
@@ -276,7 +276,7 @@ func GetTemplateGeneration(ds *appsv1alpha1.DaemonSet) (*int64, error) {
 	return &generation, nil
 }
 
-func (dsc *ReconcileDaemonSet) filterDaemonPodsToUpdate(ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, hash string, nodeToDaemonPods map[string][]*corev1.Pod) (map[string][]*corev1.Pod, error) {
+func (dsc *ReconcileDaemonSet) filterDaemonPodsToUpdate(ds *apps.DaemonSet, nodeList []*corev1.Node, hash string, nodeToDaemonPods map[string][]*corev1.Pod) (map[string][]*corev1.Pod, error) {
 	existingNodes := sets.NewString()
 	for _, node := range nodeList {
 		existingNodes.Insert(node.Name)
@@ -299,19 +299,20 @@ func (dsc *ReconcileDaemonSet) filterDaemonPodsToUpdate(ds *appsv1alpha1.DaemonS
 	return ret, nil
 }
 
-func (dsc *ReconcileDaemonSet) filterDaemonPodsNodeToUpdate(ds *appsv1alpha1.DaemonSet, hash string, nodeToDaemonPods map[string][]*corev1.Pod) ([]string, error) {
-	var err error
+func (dsc *ReconcileDaemonSet) filterDaemonPodsNodeToUpdate(ds *apps.DaemonSet, hash string, nodeToDaemonPods map[string][]*corev1.Pod) ([]string, error) {
+	// var err error
 	var partition int32
 	var selector labels.Selector
-	if ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
-		partition = *ds.Spec.UpdateStrategy.RollingUpdate.Partition
-	}
-	if ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.Selector != nil {
-		if selector, err = util.ValidatedLabelSelectorAsSelector(ds.Spec.UpdateStrategy.RollingUpdate.Selector); err != nil {
-			return nil, err
+	/*
+		if ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
+			partition = *ds.Spec.UpdateStrategy.RollingUpdate.Partition
 		}
-	}
-
+		if ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.Selector != nil {
+			if selector, err = util.ValidatedLabelSelectorAsSelector(ds.Spec.UpdateStrategy.RollingUpdate.Selector); err != nil {
+				return nil, err
+			}
+		}
+	*/
 	var allNodeNames []string
 	for nodeName := range nodeToDaemonPods {
 		allNodeNames = append(allNodeNames, nodeName)
@@ -428,7 +429,7 @@ func (dsc *ReconcileDaemonSet) inPlaceUpdatePods(ds *appsv1alpha1.DaemonSet, pod
 				}
 
 				dsc.eventRecorder.Eventf(ds, corev1.EventTypeWarning, "FailedUpdatePodInPlace", "failed to update pod %s in-place(revision %v): %v", pod.Name, curRevision.Name, res.UpdateErr)
-				durationStore.Push(keyFunc(ds), res.DelayDuration)
+				durationStore.Push(keyFunc(nil), res.DelayDuration)
 				errCh <- res.UpdateErr
 			} else {
 				deletePodsCh <- pod.Name

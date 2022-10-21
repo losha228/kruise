@@ -23,7 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,18 +69,21 @@ func RegisterFieldIndexes(c cache.Cache) error {
 		if err = indexJob(c); err != nil {
 			return
 		}
-		// broadcastjob owner
-		if utildiscovery.DiscoverObject(&appsv1alpha1.BroadcastJob{}) {
-			if err = indexBroadcastCronJob(c); err != nil {
-				return
+
+		/*
+			// broadcastjob owner
+			if utildiscovery.DiscoverObject(&appsv1alpha1.BroadcastJob{}) {
+				if err = indexBroadcastCronJob(c); err != nil {
+					return
+				}
 			}
-		}
-		// imagepulljob active
-		if utildiscovery.DiscoverObject(&appsv1alpha1.ImagePullJob{}) {
-			if err = indexImagePullJobActive(c); err != nil {
-				return
+			// imagepulljob active
+			if utildiscovery.DiscoverObject(&appsv1alpha1.ImagePullJob{}) {
+				if err = indexImagePullJobActive(c); err != nil {
+					return
+				}
 			}
-		}
+		*/
 	})
 	return err
 }

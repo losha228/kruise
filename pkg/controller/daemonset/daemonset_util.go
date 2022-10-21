@@ -19,6 +19,7 @@ package daemonset
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,7 +52,7 @@ type newPodForDS struct {
 	pod        *corev1.Pod
 }
 
-func loadNewPodForDS(ds *appsv1alpha1.DaemonSet) *corev1.Pod {
+func loadNewPodForDS(ds *apps.DaemonSet) *corev1.Pod {
 	if val, ok := newPodForDSCache.Load(ds.UID); ok {
 		newPodCache := val.(*newPodForDS)
 		if newPodCache.generation >= ds.Generation {
@@ -92,13 +93,13 @@ func nodeInSameCondition(old []corev1.NodeCondition, cur []corev1.NodeCondition)
 
 // nodeShouldRunDaemonPod checks a set of preconditions against a (node,daemonset) and returns a
 // summary. Returned booleans are:
-// * shouldRun:
+//   - shouldRun:
 //     Returns true when a daemonset should run on the node if a daemonset pod is not already
 //     running on that node.
-// * shouldContinueRunning:
+//   - shouldContinueRunning:
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
-func nodeShouldRunDaemonPod(node *corev1.Node, ds *appsv1alpha1.DaemonSet) (bool, bool) {
+func nodeShouldRunDaemonPod(node *corev1.Node, ds *apps.DaemonSet) (bool, bool) {
 	pod := NewPod(ds, node.Name)
 
 	// If the daemon set specifies a node name, check that it matches with node.Name.
@@ -144,7 +145,7 @@ func getBurstReplicas(ds *appsv1alpha1.DaemonSet) int {
 // GetPodDaemonSets returns a list of DaemonSets that potentially match a pod.
 // Only the one specified in the Pod's ControllerRef will actually manage it.
 // Returns an error only if no matching DaemonSets are found.
-func (dsc *ReconcileDaemonSet) GetPodDaemonSets(pod *corev1.Pod) ([]*appsv1alpha1.DaemonSet, error) {
+func (dsc *ReconcileDaemonSet) GetPodDaemonSets(pod *corev1.Pod) ([]*apps.DaemonSet, error) {
 	if len(pod.Labels) == 0 {
 		return nil, fmt.Errorf("no daemon sets found for pod %v because it has no labels", pod.Name)
 	}
@@ -155,7 +156,7 @@ func (dsc *ReconcileDaemonSet) GetPodDaemonSets(pod *corev1.Pod) ([]*appsv1alpha
 	}
 
 	var selector labels.Selector
-	var daemonSets []*appsv1alpha1.DaemonSet
+	var daemonSets []*apps.DaemonSet
 	for _, ds := range dsList {
 		selector, err = kruiseutil.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil {
@@ -238,16 +239,26 @@ func GetNodesNeedingPods(newPodsNum, desire, partition int, progressive bool, no
 	return nodesNeedingPods
 }
 
-func keyFunc(ds *appsv1alpha1.DaemonSet) string {
+func keyFunc(ds *apps.DaemonSet) string {
 	return fmt.Sprintf("%s/%s", ds.Namespace, ds.Name)
 }
 
-func isDaemonSetPaused(ds *appsv1alpha1.DaemonSet) bool {
-	return ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.Paused != nil && *ds.Spec.UpdateStrategy.RollingUpdate.Paused
+func isDaemonSetPaused(ds *apps.DaemonSet) bool {
+	key, found := ds.Annotations["pause"]
+	return found && strings.EqualFold("true", key)
+
+	/*
+		{
+
+		}
+		var pauseStr := GetDaemonsetAnnotationByName("pause")
+		if
+		return ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.Paused != nil && *ds.Spec.UpdateStrategy.RollingUpdate.Paused
+	*/
 }
 
 // allowSurge returns true if the daemonset allows more than a single pod on any node.
-func allowSurge(ds *appsv1alpha1.DaemonSet) bool {
+func allowSurge(ds *apps.DaemonSet) bool {
 	maxSurge, err := surgeCount(ds, 1)
 	return err == nil && maxSurge > 0
 }
@@ -255,10 +266,12 @@ func allowSurge(ds *appsv1alpha1.DaemonSet) bool {
 // surgeCount returns 0 if surge is not requested, the expected surge number to allow
 // out of numberToSchedule if surge is configured, or an error if the surge percentage
 // requested is invalid.
-func surgeCount(ds *appsv1alpha1.DaemonSet, numberToSchedule int) (int, error) {
-	if ds.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateDaemonSetStrategyType {
-		return 0, nil
-	}
+func surgeCount(ds *apps.DaemonSet, numberToSchedule int) (int, error) {
+	/*
+		if ds.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateDaemonSetStrategyType {
+			return 0, nil
+		}
+	*/
 	r := ds.Spec.UpdateStrategy.RollingUpdate
 	if r == nil {
 		return 0, nil
@@ -310,7 +323,7 @@ func getUnscheduledPodsWithoutNode(runningNodesList []*corev1.Node, nodeToDaemon
 // is at most one of each old and new pods, or false if there are multiples. We can skip
 // processing the particular node in those scenarios and let the manage loop prune the
 // excess pods for our next time around.
-func findUpdatedPodsOnNode(ds *appsv1alpha1.DaemonSet, podsOnNode []*corev1.Pod, hash string) (newPod, oldPod *corev1.Pod, ok bool) {
+func findUpdatedPodsOnNode(ds *apps.DaemonSet, podsOnNode []*corev1.Pod, hash string) (newPod, oldPod *corev1.Pod, ok bool) {
 	for _, pod := range podsOnNode {
 		if pod.DeletionTimestamp != nil {
 			continue
@@ -336,23 +349,27 @@ func findUpdatedPodsOnNode(ds *appsv1alpha1.DaemonSet, podsOnNode []*corev1.Pod,
 
 // NodeShouldUpdateBySelector checks if the node is selected to upgrade for ds's gray update selector.
 // This function does not check NodeShouldRunDaemonPod
-func NodeShouldUpdateBySelector(node *corev1.Node, ds *appsv1alpha1.DaemonSet) bool {
-	switch ds.Spec.UpdateStrategy.Type {
-	case appsv1alpha1.OnDeleteDaemonSetStrategyType:
-		return false
-	case appsv1alpha1.RollingUpdateDaemonSetStrategyType:
-		if ds.Spec.UpdateStrategy.RollingUpdate == nil || ds.Spec.UpdateStrategy.RollingUpdate.Selector == nil {
+func NodeShouldUpdateBySelector(node *corev1.Node, ds *apps.DaemonSet) bool {
+
+	/*
+		switch ds.Spec.UpdateStrategy.Type {
+		case appsv1alpha1.OnDeleteDaemonSetStrategyType:
+			return false
+		case appsv1alpha1.RollingUpdateDaemonSetStrategyType:
+			if ds.Spec.UpdateStrategy.RollingUpdate == nil || ds.Spec.UpdateStrategy.RollingUpdate.Selector == nil {
+				return false
+			}
+			selector, err := kruiseutil.ValidatedLabelSelectorAsSelector(ds.Spec.UpdateStrategy.RollingUpdate.Selector)
+			if err != nil {
+				// this should not happen if the DaemonSet passed validation
+				return false
+			}
+			return !selector.Empty() && selector.Matches(labels.Set(node.Labels))
+		default:
 			return false
 		}
-		selector, err := kruiseutil.ValidatedLabelSelectorAsSelector(ds.Spec.UpdateStrategy.RollingUpdate.Selector)
-		if err != nil {
-			// this should not happen if the DaemonSet passed validation
-			return false
-		}
-		return !selector.Empty() && selector.Matches(labels.Set(node.Labels))
-	default:
-		return false
-	}
+	*/
+	return false
 }
 
 func isPodPreDeleting(pod *corev1.Pod) bool {
@@ -370,4 +387,22 @@ func podAvailableWaitingTime(pod *corev1.Pod, minReadySeconds int32, now time.Ti
 		return minReadySecondsDuration
 	}
 	return minReadySecondsDuration - now.Sub(c.LastTransitionTime.Time)
+}
+
+func GetPodAnnotationByName(pod *corev1.Pod, key string) string {
+	for k, v := range pod.ObjectMeta.Annotations {
+		if strings.EqualFold(k, key) {
+			return v
+		}
+	}
+	return ""
+}
+
+func GetDaemonsetAnnotationByName(ds *apps.DaemonSet, key string) string {
+	for k, v := range ds.ObjectMeta.Annotations {
+		if strings.EqualFold(k, key) {
+			return v
+		}
+	}
+	return ""
 }
