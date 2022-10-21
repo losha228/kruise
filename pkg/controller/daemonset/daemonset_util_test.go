@@ -655,7 +655,7 @@ func TestNodeShouldUpdateBySelector(t *testing.T) {
 	for _, tt := range []struct {
 		Title    string
 		Node     *corev1.Node
-		Ds       *appsv1alpha1.DaemonSet
+		Ds       *apps.DaemonSet
 		Expected bool
 	}{
 		{
@@ -669,7 +669,7 @@ func TestNodeShouldUpdateBySelector(t *testing.T) {
 			newNode("node1", map[string]string{
 				"key1": "value1",
 			}),
-			func() *appsv1alpha1.DaemonSet {
+			func() *apps.DaemonSet {
 				ds := newDaemonSet("ds1")
 				ds.Spec.UpdateStrategy = newStandardRollingUpdateStrategy(map[string]string{
 					"key1": "value2",
@@ -683,7 +683,7 @@ func TestNodeShouldUpdateBySelector(t *testing.T) {
 			newNode("node1", map[string]string{
 				"key1": "value1",
 			}),
-			func() *appsv1alpha1.DaemonSet {
+			func() *apps.DaemonSet {
 				ds := newDaemonSet("ds1")
 				ds.Spec.UpdateStrategy = newStandardRollingUpdateStrategy(map[string]string{
 					"key1": "value1",
@@ -701,18 +701,14 @@ func TestNodeShouldUpdateBySelector(t *testing.T) {
 	}
 }
 
-func newStandardRollingUpdateStrategy(matchLabels map[string]string) appsv1alpha1.DaemonSetUpdateStrategy {
+func newStandardRollingUpdateStrategy(matchLabels map[string]string) apps.DaemonSetUpdateStrategy {
 	one := intstr.FromInt(1)
-	strategy := appsv1alpha1.DaemonSetUpdateStrategy{
-		Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+	strategy := apps.DaemonSetUpdateStrategy{
+		Type: apps.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &apps.RollingUpdateDaemonSet{
 			MaxUnavailable: &one,
-			Selector:       nil,
-			Type:           appsv1alpha1.StandardRollingUpdateType,
 		},
 	}
-	if len(matchLabels) > 0 {
-		strategy.RollingUpdate.Selector = &metav1.LabelSelector{MatchLabels: matchLabels}
-	}
+
 	return strategy
 }

@@ -67,6 +67,11 @@ func (dsc *ReconcileDaemonSet) constructHistory(ds *apps.DaemonSet) (cur *apps.C
 		}
 	}
 
+	/*
+		revisions := maxRevision(old)
+		hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
+	*/
+
 	currRevision := maxRevision(old) + 1
 	switch len(currentHistories) {
 	case 0:

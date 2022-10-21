@@ -67,18 +67,18 @@ func init() {
 	_ = apis.AddToScheme(scheme.Scheme)
 }
 
-func newDaemonSet(name string) *appsv1alpha1.DaemonSet {
+func newDaemonSet(name string) *apps.DaemonSet {
 	two := int32(2)
-	return &appsv1alpha1.DaemonSet{
+	return &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       uuid.NewUUID(),
 			Name:      name,
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: appsv1alpha1.DaemonSetSpec{
+		Spec: apps.DaemonSetSpec{
 			RevisionHistoryLimit: &two,
-			UpdateStrategy: appsv1alpha1.DaemonSetUpdateStrategy{
-				Type: appsv1alpha1.OnDeleteDaemonSetStrategyType,
+			UpdateStrategy: apps.DaemonSetUpdateStrategy{
+				Type: apps.OnDeleteDaemonSetStrategyType,
 			},
 			Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
 			Template: corev1.PodTemplateSpec{
@@ -294,7 +294,7 @@ func validateSyncDaemonSets(manager *daemonSetsController, fakePodControl *fakeP
 	return nil
 }
 
-func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *appsv1alpha1.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
+func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
 	t.Helper()
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
@@ -326,7 +326,7 @@ func markPodReady(pod *corev1.Pod) {
 }
 
 // clearExpectations copies the FakePodControl to PodStore and clears the create and delete expectations.
-func clearExpectations(t *testing.T, manager *daemonSetsController, ds *appsv1alpha1.DaemonSet, fakePodControl *fakePodControl) {
+func clearExpectations(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, fakePodControl *fakePodControl) {
 	fakePodControl.Clear()
 
 	key, err := controller.KeyFunc(ds)
