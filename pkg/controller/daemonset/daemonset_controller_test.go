@@ -30,7 +30,6 @@ import (
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	kruisefake "github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
 	kruiseinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions"
-	kruiseappsinformers "github.com/openkruise/kruise/pkg/client/informers/externalversions/apps/v1alpha1"
 	kruiseExpectations "github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	apps "k8s.io/api/apps/v1"
@@ -237,7 +236,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 func NewDaemonSetController(
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
-	dsInformer kruiseappsinformers.DaemonSetInformer,
+	dsInformer appsinformers.DaemonSetInformer,
 	revInformer appsinformers.ControllerRevisionInformer,
 	kubeClient clientset.Interface,
 	kruiseClient kruiseclientset.Interface,
