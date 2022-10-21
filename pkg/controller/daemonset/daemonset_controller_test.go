@@ -206,7 +206,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	dsc := NewDaemonSetController(
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
-		kruiseInformerFactory.Apps().V1alpha1().DaemonSets(),
+		informerFactory.Apps().V1().DaemonSets(),
 		informerFactory.Apps().V1().ControllerRevisions(),
 		client,
 		kruiseClient,
