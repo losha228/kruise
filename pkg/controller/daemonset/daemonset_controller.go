@@ -806,6 +806,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *apps.DaemonSet, podsToDelete, nodes
 			}
 		}
 	*/
+	klog.Infof("Pods to delete for DaemonSet %s: %+v, deleting %d", ds.Name, podsToDelete, deleteDiff)
 	klog.V(4).Infof("Pods to delete for DaemonSet %s: %+v, deleting %d", ds.Name, podsToDelete, deleteDiff)
 	deleteWait := sync.WaitGroup{}
 	deleteWait.Add(deleteDiff)

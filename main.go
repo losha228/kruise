@@ -73,6 +73,7 @@ func init() {
 }
 
 func main() {
+	flag.Set("stderrthreshold", "10")
 	var metricsAddr, pprofAddr string
 	var healthProbeAddr string
 	var enableLeaderElection, enablePprof, allowPrivileged bool
