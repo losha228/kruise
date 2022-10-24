@@ -35,6 +35,105 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
+func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*corev1.Node, curRevision *apps.ControllerRevision) error {
+	hash := curRevision.Labels[apps.DefaultDaemonSetUniqueLabelKey]
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+	if err != nil {
+		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
+	}
+	_, maxUnavailable, err := dsc.updatedDesiredNodeCounts(ds, nodeList, nodeToDaemonPods)
+	if err != nil {
+		return fmt.Errorf("couldn't get unavailable numbers: %v", err)
+	}
+
+	// Advanced: filter the pods updated, updating and can update, according to partition and selector
+	nodeToDaemonPods, err = dsc.filterDaemonPodsToUpdate(ds, nodeList, hash, nodeToDaemonPods)
+	if err != nil {
+		return fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)
+	}
+
+	now := dsc.failedPodsBackoff.Clock.Now()
+
+	// When not surging, we delete just enough pods to stay under the maxUnavailable limit, if any
+	// are necessary, and let the core loop create new instances on those nodes.
+	//
+	// Assumptions:
+	// * Expect manage loop to allow no more than one pod per node
+	// * Expect manage loop will create new pods
+	// * Expect manage loop will handle failed pods
+	// * Deleted pods do not count as unavailable so that updates make progress when nodes are down
+	// Invariants:
+	// * The number of new pods that are unavailable must be less than maxUnavailable
+	// * A node with an available old pod is a candidate for deletion if it does not violate other invariants
+	//
+
+	var numUnavailable int
+	var allowedReplacementPods []string
+	var candidatePodsToDelete []string
+	for nodeName, pods := range nodeToDaemonPods {
+		newPod, oldPod, ok := findUpdatedPodsOnNode(ds, pods, hash)
+		if !ok {
+			// let the manage loop clean up this node, and treat it as an unavailable node
+			klog.V(3).Infof("DaemonSet %s/%s has excess pods on node %s, skipping to allow the core loop to process", ds.Namespace, ds.Name, nodeName)
+			numUnavailable++
+			continue
+		}
+		switch {
+		case isPodNilOrPreDeleting(oldPod) && isPodNilOrPreDeleting(newPod), !isPodNilOrPreDeleting(oldPod) && !isPodNilOrPreDeleting(newPod):
+			// the manage loop will handle creating or deleting the appropriate pod, consider this unavailable
+			numUnavailable++
+			klog.V(5).Infof("DaemonSet %s/%s find no pods (or pre-deleting) on node %s ", ds.Namespace, ds.Name, nodeName)
+		case newPod != nil:
+			// this pod is up to date, check its availability
+			if !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
+				// an unavailable new pod is counted against maxUnavailable
+				numUnavailable++
+				klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is new and unavailable", ds.Namespace, ds.Name, newPod.Name, nodeName)
+			}
+			if isPodPreDeleting(newPod) {
+				// a pre-deleting new pod is counted against maxUnavailable
+				numUnavailable++
+				klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is pre-deleting", ds.Namespace, ds.Name, newPod.Name, nodeName)
+			}
+		default:
+			// this pod is old, it is an update candidate
+			switch {
+			case !podutil.IsPodAvailable(oldPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}):
+				// the old pod isn't available, so it needs to be replaced
+				klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is out of date and not available, allowing replacement", ds.Namespace, ds.Name, oldPod.Name, nodeName)
+				// record the replacement
+				if allowedReplacementPods == nil {
+					allowedReplacementPods = make([]string, 0, len(nodeToDaemonPods))
+				}
+				allowedReplacementPods = append(allowedReplacementPods, oldPod.Name)
+			case numUnavailable >= maxUnavailable:
+				// no point considering any other candidates
+				continue
+			default:
+				klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is out of date, this is a candidate to replace", ds.Namespace, ds.Name, oldPod.Name, nodeName)
+				// record the candidate
+				if candidatePodsToDelete == nil {
+					candidatePodsToDelete = make([]string, 0, maxUnavailable)
+				}
+				candidatePodsToDelete = append(candidatePodsToDelete, oldPod.Name)
+			}
+		}
+	}
+
+	// use any of the candidates we can, including the allowedReplacemnntPods
+	klog.V(5).Infof("DaemonSet %s/%s allowing %d replacements, up to %d unavailable, %d new are unavailable, %d candidates", ds.Namespace, ds.Name, len(allowedReplacementPods), maxUnavailable, numUnavailable, len(candidatePodsToDelete))
+	remainingUnavailable := maxUnavailable - numUnavailable
+	if remainingUnavailable < 0 {
+		remainingUnavailable = 0
+	}
+	if max := len(candidatePodsToDelete); remainingUnavailable > max {
+		remainingUnavailable = max
+	}
+	oldPodsToDelete := append(allowedReplacementPods, candidatePodsToDelete[:remainingUnavailable]...)
+
+	return dsc.syncNodes(ds, oldPodsToDelete, nil, hash)
+}
+
 // rollingUpdate identifies the set of old pods to in-place update, delete, or additional pods to create on nodes,
 // remaining within the constraints imposed by the update strategy.
 func (dsc *ReconcileDaemonSet) rollingUpdate(ds *apps.DaemonSet, nodeList []*corev1.Node, curRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) error {

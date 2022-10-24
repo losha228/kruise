@@ -363,7 +363,6 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	dsKey := request.NamespacedName.String()
 	klog.Infof("syncDaemonSet %v", dsKey)
 	ds, err := dsc.dsLister.DaemonSets(request.Namespace).Get(request.Name)
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			klog.V(4).Infof("DaemonSet has been deleted %s", dsKey)
@@ -371,6 +370,12 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 			return nil
 		}
 		return fmt.Errorf("unable to retrieve DaemonSet %s from store: %v", dsKey, err)
+	}
+
+	// check deamonset update type, we only handle OnDelete
+	if ds.Spec.UpdateStrategy.Type != apps.OnDeleteDaemonSetStrategyType {
+		klog.V(4).Infof("DaemonSet %s UpdateStrategy is not OnDelete, skip it.", dsKey)
+		return nil
 	}
 
 	// Don't process a daemon set until all its creations and deletions have been processed.
@@ -391,14 +396,13 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 		return fmt.Errorf("couldn't get list of nodes when syncing DaemonSet %#v: %v", ds, err)
 	}
 	klog.Infof("syncDaemonSet , get node list %v", nodeList)
-	// Construct histories of the DaemonSet, and get the hash of current history
-	/*
-		cur, old, err := dsc.constructHistory(ds)
-		if err != nil {
-			return fmt.Errorf("failed to construct revisions of DaemonSet: %v", err)
-		}
 
-	*/
+	// Construct histories of the DaemonSet, and get the hash of current history
+	cur, err := dsc.getCurrentDsVersion(ds)
+	if err != nil {
+		return fmt.Errorf("failed to construct revisions of DaemonSet: %v", err)
+	}
+
 	// hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
 	klog.Infof("syncDaemonSet , get ds hash %v", hash)
@@ -435,6 +439,12 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	*/
 	klog.Infof("syncDaemonSet , go to dsc.manage")
 	err = dsc.manage(ds, nodeList, hash)
+	if err != nil {
+		return err
+	}
+
+	klog.Infof("syncDaemonSet , start rolling update")
+	err = dsc.rollingUpdate2(ds, nodeList, cur)
 	if err != nil {
 		return err
 	}
@@ -693,15 +703,12 @@ func (dsc *ReconcileDaemonSet) manage(ds *apps.DaemonSet, nodeList []*corev1.Nod
 // returns slice with erros if any
 func (dsc *ReconcileDaemonSet) syncNodes(ds *apps.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
 	klog.Infof("syncNodes() ")
-	/*
-		if ds.Spec.Lifecycle != nil && ds.Spec.Lifecycle.PreDelete != nil {
-			var err error
-			podsToDelete, err = dsc.syncWithPreparingDelete(ds, podsToDelete)
-			if err != nil {
-				return err
-			}
-		}
-	*/
+
+	podsToDelete, err := dsc.syncWithPreparingDelete2(ds, podsToDelete)
+	if err != nil {
+		return err
+	}
+
 	dsKey := keyFunc(ds)
 	createDiff := len(nodesNeedingDaemonPods)
 	deleteDiff := len(podsToDelete)
@@ -807,7 +814,6 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *apps.DaemonSet, podsToDelete, nodes
 		}
 	*/
 	klog.Infof("Pods to delete for DaemonSet %s: %+v, deleting %d", ds.Name, podsToDelete, deleteDiff)
-	klog.V(4).Infof("Pods to delete for DaemonSet %s: %+v, deleting %d", ds.Name, podsToDelete, deleteDiff)
 	deleteWait := sync.WaitGroup{}
 	deleteWait.Add(deleteDiff)
 	for i := 0; i < deleteDiff; i++ {
@@ -828,7 +834,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ds *apps.DaemonSet, podsToDelete, nodes
 		}(i)
 	}
 	deleteWait.Wait()
-
+	klog.Infof("return ")
 	// collect errors if any for proper reporting/retry logic in the controller
 	var errors []error
 	close(errCh)
@@ -856,6 +862,32 @@ func (dsc *ReconcileDaemonSet) syncWithPreparingDelete(ds *appsv1alpha1.DaemonSe
 		} else if updated {
 			klog.V(3).Infof("DaemonSet %s/%s has marked Pod %s as PreparingDelete", ds.Namespace, ds.Name, podName)
 			dsc.resourceVersionExpectations.Expect(gotPod)
+		}
+	}
+	return
+}
+
+func (dsc *ReconcileDaemonSet) syncWithPreparingDelete2(ds *apps.DaemonSet, podsToDelete []string) (podsCanDelete []string, err error) {
+	for _, podName := range podsToDelete {
+		pod, err := dsc.podLister.Pods(ds.Namespace).Get(podName)
+		if errors.IsNotFound(err) {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+
+		precheckValue, found := pod.Annotations["Precheck"]
+
+		if !found {
+			klog.V(3).Infof("DaemonSet %s/%s Precheck is not found", ds.Namespace, ds.Name, podName)
+			continue
+		} else {
+			if precheckValue == "true" {
+				klog.V(3).Infof("DaemonSet %s/%s Precheck is done", ds.Namespace, ds.Name, podName)
+				podsCanDelete = append(podsCanDelete, podName)
+			} else {
+				klog.V(3).Infof("DaemonSet %s/%s Precheck is not done, will pending the delete", ds.Namespace, ds.Name, podName)
+			}
 		}
 	}
 	return

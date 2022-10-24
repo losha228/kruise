@@ -283,6 +283,13 @@ func (dsc *ReconcileDaemonSet) dedupCurHistories(ds *apps.DaemonSet, curHistorie
 	return keepCur, nil
 }
 
+func (dsc *ReconcileDaemonSet) getCurrentDsVersion(ds *apps.DaemonSet) (*apps.ControllerRevision, error) {
+	hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
+	name := ds.Name + "-" + hash
+	existedHistory, getErr := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	return existedHistory, getErr
+}
+
 type historiesByRevision []*apps.ControllerRevision
 
 func (h historiesByRevision) Len() int      { return len(h) }
