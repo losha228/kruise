@@ -36,7 +36,7 @@ fmt: go_check ## Run go fmt against code.
 	go fmt $(shell go list ./... | grep -v /vendor/)
 
 vet: ## Run go vet against code.
-	go vet $(shell go list ./... | grep -v /vendor/)
+	go vet $(shell go list ./... | grep -v /vendor/ | grep -v test/e2e)
 
 lint: golangci-lint ## Run golangci-lint against code.
 	$(GOLANGCI_LINT) run

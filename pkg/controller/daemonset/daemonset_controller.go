@@ -361,7 +361,9 @@ func (dsc *ReconcileDaemonSet) getDaemonPods(ds *apps.DaemonSet) ([]*corev1.Pod,
 
 func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	dsKey := request.NamespacedName.String()
+	klog.Infof("syncDaemonSet %v", dsKey)
 	ds, err := dsc.dsLister.DaemonSets(request.Namespace).Get(request.Name)
+	klog.Infof("syncDaemonSet %v", ds)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			klog.V(4).Infof("DaemonSet has been deleted %s", dsKey)
