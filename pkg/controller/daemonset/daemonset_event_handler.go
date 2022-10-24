@@ -69,7 +69,7 @@ func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimiting
 			return
 		}
 		klog.V(4).Infof("Pod %s/%s added.", pod.Namespace, pod.Name)
-		e.expectations.CreationObserved(keyFunc(ds))
+		// e.expectations.CreationObserved(keyFunc(ds))
 		enqueueDaemonSet(q, ds)
 		return
 	}
