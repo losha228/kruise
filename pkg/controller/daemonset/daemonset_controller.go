@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -395,7 +396,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	if err != nil {
 		return fmt.Errorf("couldn't get list of nodes when syncing DaemonSet %#v: %v", ds, err)
 	}
-	klog.Infof("syncDaemonSet , get node list %v", nodeList)
+	klog.Infof("syncDaemonSet , get node list %v", len(nodeList))
 
 	// hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
@@ -873,10 +874,10 @@ func (dsc *ReconcileDaemonSet) syncWithPreparingDelete2(ds *apps.DaemonSet, pods
 		precheckValue, found := pod.Annotations["Precheck"]
 
 		if !found {
-			klog.V(3).Infof("DaemonSet %s/%s Precheck is not found", ds.Namespace, ds.Name, podName)
+			klog.V(3).Infof("DaemonSet %s/%s Precheck is not found for pod %v", ds.Namespace, ds.Name, podName)
 			continue
 		} else {
-			if precheckValue == "true" {
+			if strings.EqualFold(precheckValue, "true") {
 				klog.V(3).Infof("DaemonSet %s/%s Precheck is done", ds.Namespace, ds.Name, podName)
 				podsCanDelete = append(podsCanDelete, podName)
 			} else {
