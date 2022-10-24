@@ -363,7 +363,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	dsKey := request.NamespacedName.String()
 	klog.Infof("syncDaemonSet %v", dsKey)
 	ds, err := dsc.dsLister.DaemonSets(request.Namespace).Get(request.Name)
-	klog.Infof("syncDaemonSet %v", ds)
+
 	if err != nil {
 		if errors.IsNotFound(err) {
 			klog.V(4).Infof("DaemonSet has been deleted %s", dsKey)
@@ -390,7 +390,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	if err != nil {
 		return fmt.Errorf("couldn't get list of nodes when syncing DaemonSet %#v: %v", ds, err)
 	}
-
+	klog.Infof("syncDaemonSet , get node list %v", nodeList)
 	// Construct histories of the DaemonSet, and get the hash of current history
 	/*
 		cur, old, err := dsc.constructHistory(ds)
@@ -401,7 +401,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	*/
 	// hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
-
+	klog.Infof("syncDaemonSet , get ds hash %v", hash)
 	/*
 		if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ds) {
 			return dsc.updateDaemonSetStatus(ds, nodeList, hash, false)
@@ -433,6 +433,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 			}
 		}
 	*/
+	klog.Infof("syncDaemonSet , go to dsc.manage")
 	err = dsc.manage(ds, nodeList, hash)
 	if err != nil {
 		return err
@@ -641,6 +642,7 @@ func (dsc *ReconcileDaemonSet) storeDaemonSetStatus(ds *appsv1alpha1.DaemonSet, 
 func (dsc *ReconcileDaemonSet) manage(ds *apps.DaemonSet, nodeList []*corev1.Node, hash string) error {
 	// Find out the pods which are created for the nodes by DaemonSets.
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+	klog.Infof("manage() , get node to pods %v", nodeToDaemonPods)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for DaemonSet %s: %v", ds.Name, err)
 	}
@@ -667,7 +669,8 @@ func (dsc *ReconcileDaemonSet) manage(ds *apps.DaemonSet, nodeList []*corev1.Nod
 	// If node doesn't exist then pods are never scheduled and can't be deleted by PodGCController.
 	// podsToDelete = append(podsToDelete, nodeToDaemonPods["worker-2"][0])
 	podsToDelete = append(podsToDelete, getUnscheduledPodsWithoutNode(nodeList, nodeToDaemonPods)...)
-
+	klog.Infof("manage() , podsToDelete %v", podsToDelete)
+	klog.Infof("manage() , go to  syncNodes() ")
 	/*
 		// This is the first deploy process.
 		if ds.Spec.UpdateStrategy.Type == appsv1alpha1.RollingUpdateDaemonSetStrategyType && ds.Spec.UpdateStrategy.RollingUpdate != nil {
@@ -689,7 +692,7 @@ func (dsc *ReconcileDaemonSet) manage(ds *apps.DaemonSet, nodeList []*corev1.Nod
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
 // returns slice with erros if any
 func (dsc *ReconcileDaemonSet) syncNodes(ds *apps.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
-
+	klog.Infof("syncNodes() ")
 	/*
 		if ds.Spec.Lifecycle != nil && ds.Spec.Lifecycle.PreDelete != nil {
 			var err error
