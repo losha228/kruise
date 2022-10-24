@@ -76,6 +76,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 	var allowedReplacementPods []string
 	var candidatePodsToDelete []string
 	for nodeName, pods := range nodeToDaemonPods {
+		klog.V(3).Infof("DaemonSet %s/%s , found pods by hash %s, ", ds.Namespace, ds.Name, hash)
 		newPod, oldPod, ok := findUpdatedPodsOnNode(ds, pods, hash)
 		if !ok {
 			// let the manage loop clean up this node, and treat it as an unavailable node

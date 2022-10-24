@@ -646,7 +646,7 @@ func (dsc *ReconcileDaemonSet) storeDaemonSetStatus(ds *appsv1alpha1.DaemonSet, 
 func (dsc *ReconcileDaemonSet) manage(ds *apps.DaemonSet, nodeList []*corev1.Node, hash string) error {
 	// Find out the pods which are created for the nodes by DaemonSets.
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
-	klog.Infof("manage() , get node to pods %v", nodeToDaemonPods)
+
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for DaemonSet %s: %v", ds.Name, err)
 	}
