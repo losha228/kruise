@@ -397,12 +397,6 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	}
 	klog.Infof("syncDaemonSet , get node list %v", nodeList)
 
-	// Construct histories of the DaemonSet, and get the hash of current history
-	cur, err := dsc.getCurrentDsVersion(ds)
-	if err != nil {
-		return fmt.Errorf("failed to construct revisions of DaemonSet: %v", err)
-	}
-
 	// hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
 	klog.Infof("syncDaemonSet , get ds hash %v", hash)
@@ -444,7 +438,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	}
 
 	klog.Infof("syncDaemonSet , start rolling update")
-	err = dsc.rollingUpdate2(ds, nodeList, cur)
+	err = dsc.rollingUpdate2(ds, nodeList, hash)
 	if err != nil {
 		return err
 	}
