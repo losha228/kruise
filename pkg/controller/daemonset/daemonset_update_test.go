@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +32,6 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestDaemonSetUpdatesPods(t *testing.T) {
@@ -717,7 +715,7 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 	now := metav1.Now()
 	type testcase struct {
 		name             string
-		rolling          *appsv1alpha1.RollingUpdateDaemonSet
+		rolling          *apps.RollingUpdateDaemonSet
 		hash             string
 		nodeToDaemonPods map[string][]*corev1.Pod
 		nodes            []*corev1.Node
@@ -726,12 +724,9 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 
 	tests := []testcase{
 		{
-			name: "Standard,partition=0",
-			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
-				Type:      appsv1alpha1.StandardRollingUpdateType,
-				Partition: utilpointer.Int32Ptr(0),
-			},
-			hash: "v2",
+			name:    "Standard,partition=0",
+			rolling: &apps.RollingUpdateDaemonSet{},
+			hash:    "v2",
 			nodeToDaemonPods: map[string][]*corev1.Pod{
 				"n1": {
 					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
@@ -746,12 +741,9 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 			expectNodes: []string{"n2", "n3", "n1"},
 		},
 		{
-			name: "Standard,partition=1",
-			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
-				Type:      appsv1alpha1.StandardRollingUpdateType,
-				Partition: utilpointer.Int32Ptr(1),
-			},
-			hash: "v2",
+			name:    "Standard,partition=1",
+			rolling: &apps.RollingUpdateDaemonSet{},
+			hash:    "v2",
 			nodeToDaemonPods: map[string][]*corev1.Pod{
 				"n1": {
 					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v2"}}},
@@ -766,13 +758,9 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 			expectNodes: []string{"n1", "n3"},
 		},
 		{
-			name: "Standard,partition=1,selector=1",
-			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
-				Type:      appsv1alpha1.StandardRollingUpdateType,
-				Partition: utilpointer.Int32Ptr(1),
-				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
-			},
-			hash: "v2",
+			name:    "Standard,partition=1,selector=1",
+			rolling: &apps.RollingUpdateDaemonSet{},
+			hash:    "v2",
 			nodeToDaemonPods: map[string][]*corev1.Pod{
 				"n1": {
 					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
@@ -796,13 +784,9 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 			expectNodes: []string{"n2", "n3"},
 		},
 		{
-			name: "Standard,partition=2,selector=3",
-			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
-				Type:      appsv1alpha1.StandardRollingUpdateType,
-				Partition: utilpointer.Int32Ptr(2),
-				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
-			},
-			hash: "v2",
+			name:    "Standard,partition=2,selector=3",
+			rolling: &apps.RollingUpdateDaemonSet{},
+			hash:    "v2",
 			nodeToDaemonPods: map[string][]*corev1.Pod{
 				"n1": {
 					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
@@ -826,13 +810,9 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 			expectNodes: []string{"n2", "n4"},
 		},
 		{
-			name: "Standard,partition=0,selector=3,terminating",
-			rolling: &appsv1alpha1.RollingUpdateDaemonSet{
-				Type:      appsv1alpha1.StandardRollingUpdateType,
-				Partition: utilpointer.Int32Ptr(0),
-				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
-			},
-			hash: "v2",
+			name:    "Standard,partition=0,selector=3,terminating",
+			rolling: &apps.RollingUpdateDaemonSet{},
+			hash:    "v2",
 			nodeToDaemonPods: map[string][]*corev1.Pod{
 				"n1": {
 					{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{apps.DefaultDaemonSetUniqueLabelKey: "v1"}}},
@@ -867,8 +847,8 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 		nodeLister := corelisters.NewNodeLister(indexer)
 		dsc := &ReconcileDaemonSet{nodeLister: nodeLister}
 
-		ds := &appsv1alpha1.DaemonSet{Spec: appsv1alpha1.DaemonSetSpec{UpdateStrategy: appsv1alpha1.DaemonSetUpdateStrategy{
-			Type:          appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+		ds := &apps.DaemonSet{Spec: apps.DaemonSetSpec{UpdateStrategy: apps.DaemonSetUpdateStrategy{
+			Type:          apps.RollingUpdateDaemonSetStrategyType,
 			RollingUpdate: test.rolling,
 		}}}
 		got, err := dsc.filterDaemonPodsNodeToUpdate(ds, test.hash, test.nodeToDaemonPods)
