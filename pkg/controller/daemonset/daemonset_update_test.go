@@ -672,7 +672,7 @@ func Test_maxRevision(t *testing.T) {
 
 func TestGetTemplateGeneration(t *testing.T) {
 	type args struct {
-		ds *appsv1alpha1.DaemonSet
+		ds *apps.DaemonSet
 	}
 	constNum := int64(1000)
 	tests := []struct {
@@ -685,9 +685,7 @@ func TestGetTemplateGeneration(t *testing.T) {
 			name: "GetTemplateGeneration",
 			args: args{
 				ds: &apps.DaemonSet{
-				{
 					TypeMeta: metav1.TypeMeta{},
-					
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
 							apps.DeprecatedTemplateGeneration: "1000",
