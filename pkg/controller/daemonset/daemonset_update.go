@@ -40,10 +40,15 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
-	_, maxUnavailable, err := dsc.updatedDesiredNodeCounts(ds, nodeList, nodeToDaemonPods)
-	if err != nil {
-		return fmt.Errorf("couldn't get unavailable numbers: %v", err)
-	}
+
+	/*
+		_, maxUnavailable, err := dsc.updatedDesiredNodeCounts(ds, nodeList, nodeToDaemonPods)
+		if err != nil {
+			return fmt.Errorf("couldn't get unavailable numbers: %v", err)
+		}
+	*/
+
+	maxUnavailable := 1
 
 	// Advanced: filter the pods updated, updating and can update, according to partition and selector
 	nodeToDaemonPods, err = dsc.filterDaemonPodsToUpdate(ds, nodeList, hash, nodeToDaemonPods)
@@ -51,6 +56,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 		return fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)
 	}
 
+	klog.V(3).Infof("Found %v nodes for DaemonSet %s/%s", len(nodeToDaemonPods), ds.Namespace, ds.Name)
 	now := dsc.failedPodsBackoff.Clock.Now()
 
 	// When not surging, we delete just enough pods to stay under the maxUnavailable limit, if any
