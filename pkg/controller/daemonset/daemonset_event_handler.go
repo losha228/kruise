@@ -170,9 +170,12 @@ func (e *podEventHandler) deletePod(pod *v1.Pod, q workqueue.RateLimitingInterfa
 		return
 	}
 
-	if _, loaded := e.deletionUIDCache.LoadOrStore(pod.UID, struct{}{}); !loaded {
-		e.expectations.DeletionObserved(keyFunc(ds))
-	}
+	/*
+		if _, loaded := e.deletionUIDCache.LoadOrStore(pod.UID, struct{}{}); !loaded {
+			e.expectations.DeletionObserved(keyFunc(ds))
+		}
+	*/
+
 	if isDeleted {
 		e.deletionUIDCache.Delete(pod.UID)
 		klog.V(4).Infof("Pod %s/%s deleted, owner: %s", pod.Namespace, pod.Name, ds.Name)
