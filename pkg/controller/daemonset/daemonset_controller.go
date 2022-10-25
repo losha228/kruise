@@ -228,10 +228,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			if oldDS.UID != newDS.UID {
 				dsc.expectations.DeleteExpectations(keyFunc(oldDS))
 			}
-			if oldDS.Spec.Template.Spec.Containers[0].Image == newDS.Spec.Template.Spec.Containers[0].Image {
-				klog.V(4).Infof("Updating DaemonSet %s/%s, but no image change, skip", newDS.Namespace, newDS.Name)
-				return false
-			}
 
 			// check DeploymentPaused
 			if DeploymentPaused, found := newDS.Annotations["DeploymentPaused"]; found {
@@ -416,6 +412,10 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	klog.Infof("template %v ", string(jsonBytes))
 	hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
 	curVersion, err := dsc.getLastestDsVersion(ds)
+	if err != nil {
+		klog.V(4).Infof("Failed to get deamonset version:  %s", err)
+		return nil
+	}
 	cur3, _ := dsc.getCurrentDsVersion(ds)
 	hash2 := curVersion.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	hash3 := cur3.Labels[apps.DefaultDaemonSetUniqueLabelKey]
