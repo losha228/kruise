@@ -119,7 +119,7 @@ func (dsc *ReconcileDaemonSet) controlledHistories(ds *apps.DaemonSet) ([]*apps.
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := kubecontroller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := dsc.kruiseClient.AppsV1alpha1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
+		fresh, err := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -286,8 +286,11 @@ func (dsc *ReconcileDaemonSet) dedupCurHistories(ds *apps.DaemonSet, curHistorie
 func (dsc *ReconcileDaemonSet) getCurrentDsVersion(ds *apps.DaemonSet) (*apps.ControllerRevision, error) {
 	hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
 	name := ds.Name + "-" + hash
-	existedHistory, getErr := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	return existedHistory, getErr
+	history, getErr := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	jsonBytes, _ := json.Marshal(history)
+
+	klog.Infof("getCurrentDsVersion() history %v ", string(jsonBytes))
+	return history, getErr
 }
 
 func (dsc *ReconcileDaemonSet) getLastestDsVersion(ds *apps.DaemonSet) (*apps.ControllerRevision, error) {
@@ -303,10 +306,14 @@ func (dsc *ReconcileDaemonSet) getLastestDsVersion(ds *apps.DaemonSet) (*apps.Co
 
 	for i, history := range histories {
 		hash := ""
-		if _, ok := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; !ok {
+		if _, ok := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; ok {
 			hash = history.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 		}
 		klog.Infof("ds %s/%s history %v:  hash %v", ds.Namespace, ds.Name, i, hash)
+		jsonBytes, _ := json.Marshal(history)
+
+		klog.Infof("getLastestDsVersion() history %v ", string(jsonBytes))
+
 		if history.Revision > max {
 			max = history.Revision
 			cur = history
