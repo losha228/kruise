@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -84,6 +85,23 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 			numUnavailable++
 			continue
 		}
+
+		// check if the new pod has postcheck tag
+		postCheckPassed := false
+		if newPod != nil {
+			if postCheck, found := newPod.Annotations["PostCheck"]; found {
+				if strings.EqualFold(postCheck, "true") {
+					postCheckPassed = true
+					klog.V(3).Infof("DaemonSet %s/%s ,pod %v on node %v Postcheck is done", ds.Namespace, ds.Name, newPod.Name, nodeName)
+				} else if strings.EqualFold(postCheck, "false") {
+					// any failure on postcheck will make ds paused
+					klog.V(3).Infof("DaemonSet %s/%s is paused due to Postcheck failed on pod %v on node %v", ds.Namespace, ds.Name, newPod.Name, nodeName)
+					dsc.UpdateDsAnnotation(ds, "DeploymentPaused", "true")
+				}
+			} else {
+				dsc.UpdatePodAnnotation(newPod, "PostCheck", "Pending")
+			}
+		}
 		switch {
 		case isPodNilOrPreDeleting(oldPod) && isPodNilOrPreDeleting(newPod), !isPodNilOrPreDeleting(oldPod) && !isPodNilOrPreDeleting(newPod):
 			// the manage loop will handle creating or deleting the appropriate pod, consider this unavailable
@@ -91,7 +109,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 			klog.V(5).Infof("DaemonSet %s/%s find no pods (or pre-deleting) on node %s ", ds.Namespace, ds.Name, nodeName)
 		case newPod != nil:
 			// this pod is up to date, check its availability
-			if !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
+			if !postCheckPassed || !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
 				// an unavailable new pod is counted against maxUnavailable
 				numUnavailable++
 				klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is new and unavailable", ds.Namespace, ds.Name, newPod.Name, nodeName)

@@ -17,6 +17,7 @@ limitations under the License.
 package daemonset
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -176,6 +178,40 @@ func (dsc *ReconcileDaemonSet) GetPodDaemonSets(pod *corev1.Pod) ([]*apps.Daemon
 	}
 
 	return daemonSets, nil
+}
+
+func (dsc *ReconcileDaemonSet) UpdatePodAnnotation(pod *corev1.Pod, key, value string) (updated bool, err error) {
+	if pod == nil {
+		return false, nil
+	}
+
+	pod = pod.DeepCopy()
+
+	body := fmt.Sprintf(
+		`{"metadata":{"annotations":{"%s":"%s"}}}`,
+		key,
+		value)
+
+	dsc.podControl.PatchPod(pod.Namespace, pod.Name, []byte(body))
+
+	return true, err
+}
+
+func (dsc *ReconcileDaemonSet) UpdateDsAnnotation(ds *apps.DaemonSet, key, value string) (updated bool, err error) {
+	if ds == nil {
+		return false, nil
+	}
+
+	ds = ds.DeepCopy()
+
+	body := fmt.Sprintf(
+		`{"metadata":{"annotations":{"%s":"%s"}}}`,
+		key,
+		value)
+
+	dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Patch(context.TODO(), ds.Name, types.StrategicMergePatchType, []byte(body), metav1.PatchOptions{})
+
+	return true, err
 }
 
 // GetPodRevision returns revision hash of this pod.
@@ -324,6 +360,7 @@ func getUnscheduledPodsWithoutNode(runningNodesList []*corev1.Node, nodeToDaemon
 // processing the particular node in those scenarios and let the manage loop prune the
 // excess pods for our next time around.
 func findUpdatedPodsOnNode(ds *apps.DaemonSet, podsOnNode []*corev1.Pod, hash string) (newPod, oldPod *corev1.Pod, ok bool) {
+
 	for _, pod := range podsOnNode {
 		if pod.DeletionTimestamp != nil {
 			continue

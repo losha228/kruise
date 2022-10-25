@@ -228,6 +228,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			if oldDS.UID != newDS.UID {
 				dsc.expectations.DeleteExpectations(keyFunc(oldDS))
 			}
+			if oldDS.Spec.Template.Spec.Containers[0].Image == newDS.Spec.Template.Spec.Containers[0].Image {
+				klog.V(4).Infof("Updating DaemonSet %s/%s, but no image change, skip", newDS.Namespace, newDS.Name)
+				return false
+			}
+
+			// check DeploymentPaused
+			if DeploymentPaused, found := newDS.Annotations["DeploymentPaused"]; found {
+				if DeploymentPaused == "true" {
+					klog.V(4).Infof("DaemonSet %s/%s is paused, skip update", newDS.Namespace, newDS.Name)
+					return false
+				}
+			}
 			klog.V(4).Infof("Updating DaemonSet %s/%s", newDS.Namespace, newDS.Name)
 			return true
 		},
@@ -708,7 +720,7 @@ func (dsc *ReconcileDaemonSet) manage(ds *apps.DaemonSet, nodeList []*corev1.Nod
 func (dsc *ReconcileDaemonSet) syncNodes(ds *apps.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
 	klog.Infof("syncNodes() ")
 
-	podsToDelete, err := dsc.syncWithPreparingDelete2(ds, podsToDelete)
+	podsToDelete, err := dsc.syncWithPreDeleteHooks(ds, podsToDelete)
 	if err != nil {
 		return err
 	}
@@ -871,7 +883,12 @@ func (dsc *ReconcileDaemonSet) syncWithPreparingDelete(ds *appsv1alpha1.DaemonSe
 	return
 }
 
-func (dsc *ReconcileDaemonSet) syncWithPreparingDelete2(ds *apps.DaemonSet, podsToDelete []string) (podsCanDelete []string, err error) {
+func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsToDelete []string) (podsCanDelete []string, err error) {
+	// get hooks from deamonset, use default hook
+	hooks := map[string]string{
+		"Precheck":   "",
+		"DeviceLock": "",
+	}
 	for _, podName := range podsToDelete {
 		pod, err := dsc.podLister.Pods(ds.Namespace).Get(podName)
 		if errors.IsNotFound(err) {
@@ -880,18 +897,27 @@ func (dsc *ReconcileDaemonSet) syncWithPreparingDelete2(ds *apps.DaemonSet, pods
 			return nil, err
 		}
 
-		precheckValue, found := pod.Annotations["Precheck"]
+		verifiedValue := 0
+		for _, hk := range hooks {
+			klog.V(3).Infof("DaemonSet %s/%s check hook %v for pod %v", ds.Namespace, ds.Name, hk, podName)
+			precheckValue, found := pod.Annotations[hk]
 
-		if !found {
-			klog.V(3).Infof("DaemonSet %s/%s Precheck is not found for pod %v", ds.Namespace, ds.Name, podName)
-			continue
-		} else {
-			if strings.EqualFold(precheckValue, "true") {
-				klog.V(3).Infof("DaemonSet %s/%s Precheck is done", ds.Namespace, ds.Name, podName)
-				podsCanDelete = append(podsCanDelete, podName)
+			if !found {
+				klog.V(3).Infof("DaemonSet %s/%s hook %v is not found for pod %v", ds.Namespace, ds.Name, hk, podName)
+				continue
 			} else {
-				klog.V(3).Infof("DaemonSet %s/%s Precheck is not done, will pending the delete", ds.Namespace, ds.Name, podName)
+				if strings.EqualFold(precheckValue, "true") {
+					klog.V(3).Infof("DaemonSet %s/%s hook %v is done for pod %v", ds.Namespace, ds.Name, hk, podName)
+					verifiedValue++
+				} else {
+					klog.V(3).Infof("DaemonSet %s/%s hook %v is not done for pod %v, will pending the delete", ds.Namespace, ds.Name, hk, podName)
+				}
 			}
+		}
+
+		if verifiedValue >= len(hooks) {
+			klog.V(3).Infof("DaemonSet %s/%s all hook are done for pod %v, it can proceed to delete.", ds.Namespace, ds.Name, podName)
+			podsCanDelete = append(podsCanDelete, podName)
 		}
 	}
 	return
