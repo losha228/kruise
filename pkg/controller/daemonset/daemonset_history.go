@@ -309,10 +309,10 @@ func (dsc *ReconcileDaemonSet) getLastestDsVersion(ds *apps.DaemonSet) (*apps.Co
 		if _, ok := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; ok {
 			hash = history.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 		}
-		klog.Infof("ds %s/%s history %v:  hash %v", ds.Namespace, ds.Name, i, hash)
-		jsonBytes, _ := json.Marshal(history)
+		klog.Infof("ds %s/%s history %v:  hash %v, revision: %v", ds.Namespace, ds.Name, i, hash, history.Revision)
+		// jsonBytes, _ := json.Marshal(history)
 
-		klog.Infof("getLastestDsVersion() history %v ", string(jsonBytes))
+		//klog.Infof("getLastestDsVersion() history %v ", string(jsonBytes))
 
 		if history.Revision > max {
 			max = history.Revision

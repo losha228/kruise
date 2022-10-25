@@ -19,6 +19,7 @@ package daemonset
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"reflect"
@@ -399,7 +400,8 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	klog.Infof("syncDaemonSet , get node list %v", len(nodeList))
 
 	// hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
-	klog.Infof("syncDaemonSet , template %v, CollisionCount: %v", ds.Spec.Template, ds.Status.CollisionCount)
+	jsonBytes, _ := json.Marshal(ds.Spec.Template)
+	klog.Infof("template %v ", string(jsonBytes))
 	hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
 	curVersion, err := dsc.getLastestDsVersion(ds)
 	cur3, _ := dsc.getCurrentDsVersion(ds)
