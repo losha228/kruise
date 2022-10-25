@@ -886,8 +886,8 @@ func (dsc *ReconcileDaemonSet) syncWithPreparingDelete(ds *appsv1alpha1.DaemonSe
 func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsToDelete []string) (podsCanDelete []string, err error) {
 	// get hooks from deamonset, use default hook
 	hooks := map[string]string{
-		"Precheck":   "",
-		"DeviceLock": "",
+		"Precheck": "",
+		//"DeviceLock": "",
 	}
 	for _, podName := range podsToDelete {
 		pod, err := dsc.podLister.Pods(ds.Namespace).Get(podName)
@@ -898,12 +898,13 @@ func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsTo
 		}
 
 		verifiedValue := 0
-		for _, hk := range hooks {
+		for hk, _ := range hooks {
 			klog.V(3).Infof("DaemonSet %s/%s check hook %v for pod %v", ds.Namespace, ds.Name, hk, podName)
 			precheckValue, found := pod.Annotations[hk]
 
 			if !found {
 				klog.V(3).Infof("DaemonSet %s/%s hook %v is not found for pod %v", ds.Namespace, ds.Name, hk, podName)
+				dsc.UpdatePodAnnotation(pod, hk, "Pending")
 				continue
 			} else {
 				if strings.EqualFold(precheckValue, "true") {
