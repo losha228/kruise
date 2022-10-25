@@ -19,7 +19,6 @@ package daemonset
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"reflect"
@@ -408,20 +407,20 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	klog.Infof("syncDaemonSet , get node list %v", len(nodeList))
 
 	// hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
-	jsonBytes, _ := json.Marshal(ds.Spec.Template)
-	klog.Infof("template %v ", string(jsonBytes))
-	hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
+	// jsonBytes, _ := json.Marshal(ds.Spec.Template)
+	//klog.Infof("template %v ", string(jsonBytes))
+	//hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
 	curVersion, err := dsc.getLastestDsVersion(ds)
-	if err != nil {
+	if err != nil || curVersion == nil {
 		klog.V(4).Infof("Failed to get deamonset version:  %s", err)
 		return nil
 	}
-	cur3, _ := dsc.getCurrentDsVersion(ds)
-	hash2 := curVersion.Labels[apps.DefaultDaemonSetUniqueLabelKey]
-	hash3 := cur3.Labels[apps.DefaultDaemonSetUniqueLabelKey]
-	klog.Infof("syncDaemonSet , get ds hash %v", hash)
-	klog.Infof("syncDaemonSet , get ds hash2 %v", hash2)
-	klog.Infof("syncDaemonSet , get ds hash3 %v", hash3)
+	//cur3, _ := dsc.getCurrentDsVersion(ds)
+	hash := curVersion.Labels[apps.DefaultDaemonSetUniqueLabelKey]
+	//hash3 := cur3.Labels[apps.DefaultDaemonSetUniqueLabelKey]
+	//klog.Infof("syncDaemonSet , get ds hash %v", hash)
+	klog.Infof("syncDaemonSet , get ds hash2 %v", hash)
+	//klog.Infof("syncDaemonSet , get ds hash3 %v", hash3)
 	/*
 		if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ds) {
 			return dsc.updateDaemonSetStatus(ds, nodeList, hash, false)
@@ -460,7 +459,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	}
 
 	klog.Infof("syncDaemonSet , start rolling update")
-	err = dsc.rollingUpdate2(ds, nodeList, hash2)
+	err = dsc.rollingUpdate2(ds, nodeList, hash)
 	if err != nil {
 		return err
 	}
