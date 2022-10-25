@@ -400,7 +400,10 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 
 	// hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
+	curVersion, err := dsc.getLastestDsVersion(ds)
+	hash2 := curVersion.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	klog.Infof("syncDaemonSet , get ds hash %v", hash)
+	klog.Infof("syncDaemonSet , get ds hash2 %v", hash2)
 	/*
 		if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ds) {
 			return dsc.updateDaemonSetStatus(ds, nodeList, hash, false)
@@ -439,7 +442,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 	}
 
 	klog.Infof("syncDaemonSet , start rolling update")
-	err = dsc.rollingUpdate2(ds, nodeList, hash)
+	err = dsc.rollingUpdate2(ds, nodeList, hash2)
 	if err != nil {
 		return err
 	}

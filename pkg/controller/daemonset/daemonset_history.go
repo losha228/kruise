@@ -290,6 +290,32 @@ func (dsc *ReconcileDaemonSet) getCurrentDsVersion(ds *apps.DaemonSet) (*apps.Co
 	return existedHistory, getErr
 }
 
+func (dsc *ReconcileDaemonSet) getLastestDsVersion(ds *apps.DaemonSet) (*apps.ControllerRevision, error) {
+	var histories []*apps.ControllerRevision
+
+	var cur *apps.ControllerRevision
+	histories, err := dsc.controlledHistories(ds)
+	if err != nil {
+		return nil, err
+	}
+
+	max := int64(0)
+
+	for i, history := range histories {
+		hash := ""
+		if _, ok := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; !ok {
+			hash = history.Labels[apps.DefaultDaemonSetUniqueLabelKey]
+		}
+		klog.Infof("ds %s/%s history %v:  hash %v", ds.Namespace, ds.Name, i, hash)
+		if history.Revision > max {
+			max = history.Revision
+			cur = history
+		}
+	}
+
+	return cur, err
+}
+
 type historiesByRevision []*apps.ControllerRevision
 
 func (h historiesByRevision) Len() int      { return len(h) }
