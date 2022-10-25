@@ -118,7 +118,7 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 	cfg := ctrl.GetConfigOrDie()
 	setRestConfig(cfg)
-	cfg.UserAgent = "kruise-manager"
+	cfg.UserAgent = "sonic-manager"
 
 	setupLog.Info("new clientset registry")
 	err := extclient.NewRegistry(cfg)
@@ -141,7 +141,7 @@ func main() {
 		MetricsBindAddress:         metricsAddr,
 		HealthProbeBindAddress:     healthProbeAddr,
 		LeaderElection:             enableLeaderElection,
-		LeaderElectionID:           "kruise-manager",
+		LeaderElectionID:           "sonic-deamonset-manager",
 		LeaderElectionNamespace:    leaderElectionNamespace,
 		LeaderElectionResourceLock: resourcelock.ConfigMapsResourceLock,
 		Namespace:                  namespace,
