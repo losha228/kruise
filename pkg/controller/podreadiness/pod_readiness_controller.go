@@ -140,9 +140,8 @@ func (r *ReconcilePodReadiness) Reconcile(_ context.Context, request reconcile.R
 	}()
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		pod := &v1.Pod{}
 		// err = r.Get(context.TODO(), request.NamespacedName, pod)
-		pod, err := r.kubeClient.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		pod, err := r.kubeClient.CoreV1().Pods(request.Namespace).Get(context.TODO(), request.Name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				// Object not found, return.  Created objects are automatically garbage collected.
