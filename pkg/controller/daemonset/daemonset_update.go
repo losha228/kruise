@@ -91,13 +91,14 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 		if newPod != nil {
 			postcheckPending := false
 			postCheck, found := newPod.Annotations["PostCheck"]
+			klog.V(3).Infof("DaemonSet %s/%s ,new pod %v found, postcheck %v ", ds.Namespace, ds.Name, newPod.Name, postCheck)
 			if found {
 				if strings.EqualFold(postCheck, "completed") {
 					postCheckPassed = true
 					dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPostCheckSuccess", fmt.Sprintf("Postcheck for pod %v was completed.", newPod.Name))
 					klog.V(3).Infof("DaemonSet %s/%s ,pod %v on node %v Postcheck is done", ds.Namespace, ds.Name, newPod.Name, nodeName)
 				} else if strings.EqualFold(postCheck, "failed") {
-					dsc.eventRecorder.Eventf(ds, corev1.EventTypeWarning, "PodPostCheckFailure", fmt.Sprintf("This DaemonSet update is paused due to pod %v postcheck failure.", newPod.Name))
+					dsc.eventRecorder.Eventf(ds, corev1.EventTypeWarning, "PodPostCheckFailure", fmt.Sprintf("This DaemonSet update is paused due to pod %v postcheck failure on node %v.", newPod.Name, nodeName))
 					// any failure on postcheck will make ds paused
 					klog.V(3).Infof("DaemonSet %s/%s is paused due to Postcheck failed on pod %v on node %v", ds.Namespace, ds.Name, newPod.Name, nodeName)
 					dsc.UpdateDsAnnotation(ds, "DeploymentPaused", "true")
@@ -107,7 +108,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 			}
 			if !found || postcheckPending {
 				dsc.UpdatePodAnnotation(newPod, "PostCheck", "Pending")
-				dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPostCheckPending", fmt.Sprintf("The pod %v was updated, and is pending for postcheck now.", newPod.Name))
+				dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPostCheckPending", fmt.Sprintf("The pod %v was updated on node %v, and is pending for postcheck now.", newPod.Name, nodeName))
 			}
 		}
 		switch {
