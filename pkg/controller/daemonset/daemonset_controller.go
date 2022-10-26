@@ -235,6 +235,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 					return false
 				}
 			}
+
+			if oldDS.Spec.Template.Spec.Containers[0].Image == newDS.Spec.Template.Spec.Containers[0].Image {
+				klog.V(4).Infof("Updating DaemonSet %s/%s, no container change, skip", newDS.Namespace, newDS.Name)
+				return false
+			}
 			klog.V(4).Infof("Updating DaemonSet %s/%s", newDS.Namespace, newDS.Name)
 			return true
 		},
@@ -415,12 +420,12 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 		klog.V(4).Infof("Failed to get deamonset version:  %s", err)
 		return nil
 	}
-	//cur3, _ := dsc.getCurrentDsVersion(ds)
+	cur2, _ := dsc.getCurrentDsVersion(ds)
 	hash := curVersion.Labels[apps.DefaultDaemonSetUniqueLabelKey]
-	//hash3 := cur3.Labels[apps.DefaultDaemonSetUniqueLabelKey]
+	hash2 := cur2.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	//klog.Infof("syncDaemonSet , get ds hash %v", hash)
-	klog.Infof("syncDaemonSet , get ds hash2 %v", hash)
-	//klog.Infof("syncDaemonSet , get ds hash3 %v", hash3)
+	klog.Infof("syncDaemonSet , get ds hash %v", hash)
+	klog.Infof("syncDaemonSet , get ds by getCurrentDsVersion() hash2 %v", hash2)
 	/*
 		if !dsc.expectations.SatisfiedExpectations(dsKey) || !dsc.hasPodExpectationsSatisfied(ds) {
 			return dsc.updateDaemonSetStatus(ds, nodeList, hash, false)

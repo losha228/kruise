@@ -284,13 +284,48 @@ func (dsc *ReconcileDaemonSet) dedupCurHistories(ds *apps.DaemonSet, curHistorie
 }
 
 func (dsc *ReconcileDaemonSet) getCurrentDsVersion(ds *apps.DaemonSet) (*apps.ControllerRevision, error) {
-	hash := kubecontroller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
-	name := ds.Name + "-" + hash
-	history, getErr := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	jsonBytes, _ := json.Marshal(history)
+	selector, err := util.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
 
-	klog.Infof("getCurrentDsVersion() history %v ", string(jsonBytes))
-	return history, getErr
+	var cur *apps.ControllerRevision
+
+	// List all histories to include those that don't match the selector anymore
+	// but have a ControllerRef pointing to the controller.
+	histories, err := dsc.historyLister.List(selector)
+	if err != nil {
+		return nil, err
+	}
+
+	max := int64(0)
+
+	for i, history := range histories {
+		hash := ""
+		if _, ok := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; ok {
+			hash = history.Labels[apps.DefaultDaemonSetUniqueLabelKey]
+		}
+		klog.Infof("ds %s/%s history %v:  hash %v, revision: %v", ds.Namespace, ds.Name, i, hash, history.Revision)
+		// jsonBytes, _ := json.Marshal(history)
+
+		//klog.Infof("getLastestDsVersion() history %v ", string(jsonBytes))
+
+		if history.Revision > max {
+			max = history.Revision
+			cur = history
+		}
+	}
+	klog.Infof("ds %s/%s , total revision %v, max revision: %v", ds.Namespace, ds.Name, len(histories), max)
+	matched, err := Match(ds, cur)
+	if err != nil {
+		klog.Infof("ds %s/%s history %v:  failed match revision: %v", ds.Namespace, ds.Name, cur.Revision, err)
+		return nil, err
+	}
+	if !matched {
+		klog.Infof("ds %s/%s history %v:  mismatch revision: %v", ds.Namespace, ds.Name, cur.Revision)
+		return nil, fmt.Errorf("history is mismatch with ds")
+	}
+	return cur, err
 }
 
 func (dsc *ReconcileDaemonSet) getLastestDsVersion(ds *apps.DaemonSet) (*apps.ControllerRevision, error) {

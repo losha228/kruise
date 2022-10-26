@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -36,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openkruise/kruise/pkg/util"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 var _ handler.EventHandler = &podEventHandler{}
@@ -51,6 +53,13 @@ func enqueueDaemonSet(q workqueue.RateLimitingInterface, ds *apps.DaemonSet) {
 		Name:      ds.GetName(),
 		Namespace: ds.GetNamespace(),
 	}})
+}
+
+func enqueueDaemonSetAfter(q workqueue.RateLimitingInterface, ds *apps.DaemonSet, after time.Duration) {
+	q.AddAfter(reconcile.Request{NamespacedName: types.NamespacedName{
+		Name:      ds.GetName(),
+		Namespace: ds.GetNamespace(),
+	}}, after)
 }
 
 func (e *podEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
@@ -132,6 +141,13 @@ func (e *podEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimiting
 		}
 		klog.V(4).Infof("Pod %s/%s updated, owner: %s", curPod.Namespace, curPod.Name, ds.Name)
 		enqueueDaemonSet(q, ds)
+		changedToReady := !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod)
+		// See https://github.com/kubernetes/kubernetes/pull/38076 for more details
+		if changedToReady && ds.Spec.MinReadySeconds > 0 {
+			// Add a second to avoid milliseconds skew in AddAfter.
+			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
+			enqueueDaemonSetAfter(q, ds, (time.Duration(ds.Spec.MinReadySeconds)*time.Second)+time.Second)
+		}
 		return
 	}
 
