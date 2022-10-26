@@ -157,16 +157,16 @@ func (r *ReconcilePodReadiness) Reconcile(_ context.Context, request reconcile.R
 		}
 
 		// check precheck hook
-		if precheck, prechckFound := pod.Annotations["Precheck"]; prechckFound {
+		if precheck, prechckFound := pod.Annotations["PreCheck"]; prechckFound {
 			if !strings.EqualFold(precheck, "completed") {
-				r.doCheck(pod, "Precheck")
+				r.doCheck(pod, "PreCheck")
 			}
 
 		}
 
-		if postcheck, postchckFound := pod.Annotations["Postcheck"]; postchckFound {
+		if postcheck, postchckFound := pod.Annotations["PostCheck"]; postchckFound {
 			if !strings.EqualFold(postcheck, "completed") {
-				r.doCheck(pod, "Postcheck")
+				r.doCheck(pod, "PostCheck")
 			}
 		}
 
@@ -196,8 +196,8 @@ func (r *ReconcilePodReadiness) checkCondition(pod *v1.Pod) bool {
 		return false
 	}
 
-	precheck, prechckFound := pod.Annotations["Precheck"]
-	postcheck, postchckFound := pod.Annotations["Postcheck"]
+	precheck, prechckFound := pod.Annotations["PreCheck"]
+	postcheck, postchckFound := pod.Annotations["PostCheck"]
 	if !prechckFound && !postchckFound {
 		return false
 	}
