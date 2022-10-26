@@ -93,11 +93,11 @@ func add(mgr manager.Manager, r *ReconcilePodReadiness) error {
 	err = c.Watch(&source.Kind{Type: &v1.Pod{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			pod := e.Object.(*v1.Pod)
-			return r.checkCondition(pod.Annotations)
+			return r.checkCondition(pod)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			pod := e.ObjectNew.(*v1.Pod)
-			return r.checkCondition(pod.Annotations)
+			return r.checkCondition(pod)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return false
