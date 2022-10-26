@@ -322,7 +322,7 @@ func (dsc *ReconcileDaemonSet) getCurrentDsVersion(ds *apps.DaemonSet) (*apps.Co
 		return nil, err
 	}
 	if !matched {
-		klog.Infof("ds %s/%s history %v:  mismatch revision: %v", ds.Namespace, ds.Name, cur.Revision)
+		klog.Infof("ds %s/%s mismatch revision: %v", ds.Namespace, ds.Name, cur.Revision)
 		return nil, fmt.Errorf("history is mismatch with ds")
 	}
 	return cur, err

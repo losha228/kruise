@@ -421,6 +421,11 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(request reconcile.Request) error {
 		return nil
 	}
 	cur2, _ := dsc.getCurrentDsVersion(ds)
+	if cur2 == nil {
+		klog.V(4).Infof("Failed to get deamonset version for %s/%s, will try it later.", ds.Namespace, ds.Name)
+		durationStore.Push(keyFunc(ds), time.Duration(5)*time.Second)
+		return nil
+	}
 	hash := curVersion.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	hash2 := cur2.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 	//klog.Infof("syncDaemonSet , get ds hash %v", hash)
