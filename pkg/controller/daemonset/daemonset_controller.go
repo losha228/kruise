@@ -913,6 +913,7 @@ func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsTo
 
 			if !found {
 				klog.V(3).Infof("DaemonSet %s/%s hook %v is not found for pod %v", ds.Namespace, ds.Name, hk, podName)
+				dsc.UpdatePodAnnotation(pod, "PostCheck", "")
 				dsc.UpdatePodAnnotation(pod, hk, "Pending")
 				dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPreCheckPending", fmt.Sprintf("The pod %v update is pending for precheck now.", podName))
 				continue
