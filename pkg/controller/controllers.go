@@ -18,6 +18,7 @@ package controller
 
 import (
 	"github.com/openkruise/kruise/pkg/controller/daemonset"
+	"github.com/openkruise/kruise/pkg/controller/podreadiness"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -36,7 +37,9 @@ func init() {
 	/*
 		controllerAddFuncs = append(controllerAddFuncs, nodeimage.Add)
 		controllerAddFuncs = append(controllerAddFuncs, imagepulljob.Add)
-		controllerAddFuncs = append(controllerAddFuncs, podreadiness.Add)
+	*/
+	controllerAddFuncs = append(controllerAddFuncs, podreadiness.Add)
+	/*
 		controllerAddFuncs = append(controllerAddFuncs, sidecarset.Add)
 		controllerAddFuncs = append(controllerAddFuncs, statefulset.Add)
 		controllerAddFuncs = append(controllerAddFuncs, uniteddeployment.Add)
