@@ -23,6 +23,7 @@ const (
 	DaemonSetPrecheckHookCheckDetailsKey  = "hook.daemonset.sonic/precheck-check-details"
 	DaemonSetPrecheckHookProbeDetailsKey  = "hook.daemonset.sonic/precheck-probe-details"
 	DaemonSetPostcheckHookKey             = "hook.daemonset.sonic/postcheck"
+	DaemonSetEventPublishedHookKey        = "hook.daemonset.sonic/event-published"
 	DaemonSetPostcheckHookCheckDetailsKey = "hook.daemonset.sonic/postcheck-check-details"
 	DaemonSetPostcheckHookProbeDetailsKey = "hook.daemonset.sonic/postcheck-probe-details"
 	DaemonSetHookCheckerEnabledKey        = "hook.daemonset.sonic/hook-checker-enabled"
