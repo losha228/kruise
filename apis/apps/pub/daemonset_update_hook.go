@@ -21,9 +21,9 @@ const (
 	DaemonSetPostcheckHookKey      = "hook.daemonset.sonic/postcheck"
 	DaemonSetHookCheckerEnabledKey = "hook.daemonset.sonic/hook-checker-enabled"
 
-	DaemonSetHookStatePending   DaemonsetHookStateType = "Pending"
-	DaemonSetHookStateCompleted DaemonsetHookStateType = "Completed"
-	DaemonSetHookStateFailed    DaemonsetHookStateType = "Failed"
+	DaemonSetHookStatePending   DaemonsetHookStateType = "pending"
+	DaemonSetHookStateCompleted DaemonsetHookStateType = "completed"
+	DaemonSetHookStateFailed    DaemonsetHookStateType = "failed"
 
 	DaemonSetDeploymentPausedKey = "deployment.daemonset.sonic/paused"
 )

@@ -29,6 +29,7 @@ import (
 	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -280,17 +281,8 @@ func keyFunc(ds *apps.DaemonSet) string {
 }
 
 func isDaemonSetPaused(ds *apps.DaemonSet) bool {
-	key, found := ds.Annotations["pause"]
+	key, found := ds.Annotations[appspub.DaemonSetDeploymentPausedKey]
 	return found && strings.EqualFold("true", key)
-
-	/*
-		{
-
-		}
-		var pauseStr := GetDaemonsetAnnotationByName("pause")
-		if
-		return ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.Paused != nil && *ds.Spec.UpdateStrategy.RollingUpdate.Paused
-	*/
 }
 
 // allowSurge returns true if the daemonset allows more than a single pod on any node.
@@ -322,17 +314,26 @@ func surgeCount(ds *apps.DaemonSet, numberToSchedule int) (int, error) {
 // unavailability number to allow out of numberToSchedule if requested, or an error if
 // the unavailability percentage requested is invalid.
 func unavailableCount(ds *appsv1alpha1.DaemonSet, numberToSchedule int) (int, error) {
-	if ds.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateDaemonSetStrategyType {
-		return 0, nil
+	var maxUnavailable *intstr.IntOrString
+	maxUnavailableInAnnotations, found := ds.Annotations["roolingupdate.daemonset.sonic/max-unavailable"]
+
+	if found && ds.Spec.UpdateStrategy.Type == appsv1alpha1.OnDeleteDaemonSetStrategyType {
+		v := intstr.FromString(maxUnavailableInAnnotations)
+		maxUnavailable = &v
+	} else {
+		if ds.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateDaemonSetStrategyType {
+			return 0, nil
+		}
+		r := ds.Spec.UpdateStrategy.RollingUpdate
+		if r == nil {
+			return 0, nil
+		}
+		if r.MaxUnavailable == nil {
+			return 0, nil
+		}
+		maxUnavailable = r.MaxUnavailable
 	}
-	r := ds.Spec.UpdateStrategy.RollingUpdate
-	if r == nil {
-		return 0, nil
-	}
-	if r.MaxUnavailable == nil {
-		return 0, nil
-	}
-	return intstrutil.GetScaledValueFromIntOrPercent(r.MaxUnavailable, numberToSchedule, true)
+	return intstrutil.GetScaledValueFromIntOrPercent(maxUnavailable, numberToSchedule, true)
 }
 
 // getUnscheduledPodsWithoutNode returns list of unscheduled pods assigned to not existing nodes.
