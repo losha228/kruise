@@ -94,9 +94,12 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 			if found {
 				if strings.EqualFold(postCheck, string(appspub.DaemonSetHookStateCompleted)) {
 					postCheckPassed = true
-
 					// dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPostCheck", fmt.Sprintf("Postcheck for pod %v on node %v was completed.", newPod.Name, nodeName))
-
+					if precheckStatus, found := newPod.Annotations[string(appspub.DaemonSetPostcheckHookKey)]; found {
+						if precheckStatus != "" {
+							dsc.UpdatePodAnnotation(newPod, string(appspub.DaemonSetPrecheckHookKey), "")
+						}
+					}
 					klog.V(3).Infof("DaemonSet %s/%s ,pod %v on node %v Postcheck is done", ds.Namespace, ds.Name, newPod.Name, nodeName)
 				} else if strings.EqualFold(postCheck, string(appspub.DaemonSetHookStateFailed)) {
 

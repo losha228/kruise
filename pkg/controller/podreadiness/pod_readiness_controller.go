@@ -160,7 +160,7 @@ func (r *ReconcilePodReadiness) Reconcile(_ context.Context, request reconcile.R
 
 		// check precheck hook
 		if precheck, prechckFound := pod.Annotations[string(appspub.DaemonSetPrecheckHookKey)]; prechckFound {
-			if !strings.EqualFold(precheck, string(appspub.DaemonSetHookStateCompleted)) {
+			if strings.EqualFold(precheck, string(appspub.DaemonSetHookStatePending)) {
 				precheckErr := r.doCheck(pod, string(appspub.DaemonSetPrecheckHookKey))
 				if precheckErr != nil {
 					return precheckErr
@@ -170,7 +170,7 @@ func (r *ReconcilePodReadiness) Reconcile(_ context.Context, request reconcile.R
 
 		// check postcheck hook
 		if postcheck, postchckFound := pod.Annotations[string(appspub.DaemonSetPostcheckHookKey)]; postchckFound {
-			if !strings.EqualFold(postcheck, string(appspub.DaemonSetHookStateCompleted)) {
+			if strings.EqualFold(postcheck, string(appspub.DaemonSetHookStatePending)) {
 				postcheckErr := r.doCheck(pod, string(appspub.DaemonSetPostcheckHookKey))
 				if postcheckErr != nil {
 					return postcheckErr
