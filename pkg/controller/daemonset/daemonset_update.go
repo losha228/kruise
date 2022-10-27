@@ -118,6 +118,12 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 				dsc.UpdatePodAnnotation(newPod, string(appspub.DaemonSetPostcheckHookKey), string(appspub.DaemonSetHookStatePending))
 				dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPostCheck", fmt.Sprintf("Postcheck for pod %v on node %v is pending now.", newPod.Name, nodeName))
 			}
+
+			// test
+			_, err = dsc.UpdateProbeDetails(newPod, "test", "test")
+			if err != nil {
+				klog.V(5).Infof("*****fail to update details : %v", err)
+			}
 		}
 
 		switch {
