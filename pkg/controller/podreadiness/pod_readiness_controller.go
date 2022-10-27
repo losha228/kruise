@@ -205,9 +205,9 @@ func (r *ReconcilePodReadiness) doCheck(pod *v1.Pod, checkType string) error {
 	newCheckDetails.LastProbeTime = metav1.Now()
 	if details, err := json.Marshal(newCheckDetails); err == nil {
 		if checkType == string(appspub.DaemonSetPrecheckHookKey) {
-			r.updatePodAnnotation(pod, string(appspub.DaemonSetPrecheckHookCheckDetailsKey), string(details))
+			r.updatePodAnnotation(pod, string(appspub.DaemonSetPrecheckHookProbeDetailsKey), string(details))
 		} else if checkType == string(appspub.DaemonSetPostcheckHookKey) {
-			r.updatePodAnnotation(pod, string(appspub.DaemonSetPostcheckHookCheckDetailsKey), string(details))
+			r.updatePodAnnotation(pod, string(appspub.DaemonSetPostcheckHookProbeDetailsKey), string(details))
 		}
 	}
 

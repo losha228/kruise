@@ -127,17 +127,18 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 					// clean precheck
 					dsc.UpdatePodAnnotation(newPod, string(appspub.DaemonSetPrecheckHookKey), "")
 				}
-				dsc.UpdatePodAnnotation(newPod, string(appspub.DaemonSetPostcheckHookKey), string(appspub.DaemonSetHookStatePending))
 				if newCheckDetails.Status != oldCheckDetails.Status {
+					dsc.UpdatePodAnnotation(newPod, string(appspub.DaemonSetPostcheckHookKey), newCheckDetails.Status)
 					dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPostCheck", fmt.Sprintf("Postcheck for pod %v on node %v is pending now.", newPod.Name, nodeName))
 				}
 			}
 
 			// update probe details
 			if newCheckDetails.Status == string(appspub.DaemonSetHookStatePending) || newCheckDetails.Status != oldCheckDetails.Status {
+				klog.V(3).Infof("DaemonSet %s/%s update probe details for pod %v", ds.Namespace, ds.Name, newPod.Name)
 				newCheckDetails.LastProbeTime = metav1.Now()
 				if details, err := json.Marshal(newCheckDetails); err == nil {
-					dsc.UpdateDsAnnotation(ds, string(appspub.DaemonSetPostcheckHookCheckDetailsKey), string(details))
+					dsc.UpdatePodAnnotation(newPod, string(appspub.DaemonSetPostcheckHookCheckDetailsKey), string(details))
 				} else {
 					klog.V(3).Infof("DaemonSet %s/%s fail to generate probe details %v", ds.Namespace, ds.Name, err)
 				}
