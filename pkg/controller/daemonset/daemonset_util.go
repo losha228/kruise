@@ -193,7 +193,7 @@ func (dsc *ReconcileDaemonSet) UpdatePodAnnotation(pod *corev1.Pod, key, value s
 		key,
 		value)
 
-	dsc.podControl.PatchPod(pod.Namespace, pod.Name, []byte(body))
+	err = dsc.podControl.PatchPod(pod.Namespace, pod.Name, []byte(body))
 
 	return true, err
 }
@@ -210,7 +210,7 @@ func (dsc *ReconcileDaemonSet) UpdateDsAnnotation(ds *apps.DaemonSet, key, value
 		key,
 		value)
 
-	dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Patch(context.TODO(), ds.Name, types.StrategicMergePatchType, []byte(body), metav1.PatchOptions{})
+	_, err = dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Patch(context.TODO(), ds.Name, types.StrategicMergePatchType, []byte(body), metav1.PatchOptions{})
 
 	return true, err
 }
