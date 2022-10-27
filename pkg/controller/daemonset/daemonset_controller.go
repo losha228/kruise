@@ -919,14 +919,12 @@ func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsTo
 				continue
 			} else {
 				if strings.EqualFold(precheckValue, string(appspub.DaemonSetHookStateCompleted)) {
-
 					klog.V(3).Infof("DaemonSet %s/%s hook %v is done for pod %v", ds.Namespace, ds.Name, hk, podName)
-
 					dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPreCheckSuccess", fmt.Sprintf("The pod %v precheck was completed.", podName))
-
 					verifiedValue++
-				} else {
-
+				} else if !strings.EqualFold(precheckValue, string(appspub.DaemonSetHookStatePending)) {
+					dsc.UpdatePodAnnotation(pod, string(appspub.DaemonSetPostcheckHookKey), "")
+					dsc.UpdatePodAnnotation(pod, string(appspub.DaemonSetPrecheckHookKey), string(appspub.DaemonSetHookStatePending))
 					klog.V(3).Infof("DaemonSet %s/%s hook %v is not done for pod %v, will pending the delete", ds.Namespace, ds.Name, hk, podName)
 				}
 			}
