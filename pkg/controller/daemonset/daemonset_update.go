@@ -17,6 +17,7 @@ limitations under the License.
 package daemonset
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -120,9 +121,26 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 			}
 
 			// test
-			_, err = dsc.UpdateProbeDetails(newPod, "test", "test")
+			newStatusDetail := &appspub.DaemonSetHookDetails{
+				Type:          "PostCheck",
+				LastProbeTime: metav1.Now(),
+				Message:       "post check",
+				Status:        string(appspub.DaemonSetHookStatePending),
+			}
+			_, err = dsc.UpdateProbeDetails(newPod, string(appspub.DaemonSetPostcheckHookCheckDetailsKey), newStatusDetail)
 			if err != nil {
 				klog.V(5).Infof("*****fail to update details : %v", err)
+			}
+
+			// test load
+			if oldStatusDetailStr, detailFound := newPod.Annotations[string(appspub.DaemonSetPostcheckHookCheckDetailsKey)]; detailFound {
+				oldStatusDetail := appspub.DaemonSetHookDetails{}
+				err := json.Unmarshal([]byte(oldStatusDetailStr), &oldStatusDetail)
+				if err == nil {
+					klog.V(5).Infof("*****update details : %v, %v", oldStatusDetail, oldStatusDetail.LastProbeTime)
+				} else {
+					klog.V(5).Infof("*****fail to update details : %v", err)
+				}
 			}
 		}
 

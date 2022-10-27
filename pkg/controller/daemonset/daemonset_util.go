@@ -199,36 +199,34 @@ func (dsc *ReconcileDaemonSet) UpdatePodAnnotation(pod *corev1.Pod, key, value s
 	return true, err
 }
 
-func (dsc *ReconcileDaemonSet) UpdateProbeDetails(pod *corev1.Pod, key, value string) (updated bool, err error) {
+func (dsc *ReconcileDaemonSet) UpdateProbeDetails(pod *corev1.Pod, key string, details *appspub.DaemonSetHookDetails) (updated bool, err error) {
 	if pod == nil {
 		return false, nil
 	}
 
 	pod = pod.DeepCopy()
 
-	data := &appspub.DaemonSetHookDetails{}
-	data.Status = "pending"
-	data.LastProbeTime = metav1.Now()
-	data.Type = "Postcheck"
-	data.Message = "test"
+	dataStr, err := json.Marshal(details)
+	if err != nil {
+		return false, err
+	}
 
-	dataStr, _ := json.Marshal(&data)
-	output, _ := json.Marshal(string(dataStr))
+	// escape the ""
+	dataStr, err = json.Marshal(string(dataStr))
+	if err != nil {
+		return false, err
+	}
 
-	// re-marchal the string to escape
-	/*
-		newStr, _ := json.Marshal(value)
-		result := strings.ReplaceAll(string(newStr), "}", "\\}")
-		result = strings.ReplaceAll(result, "{", "\\{")
-	*/
 	body := fmt.Sprintf(
 		`{"metadata":{"annotations":{"%s": %s}}}`,
 		key,
-		string(output))
+		string(dataStr))
 
 	err = dsc.podControl.PatchPod(pod.Namespace, pod.Name, []byte(body))
-
-	return true, err
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (dsc *ReconcileDaemonSet) UpdateDsAnnotation(ds *apps.DaemonSet, key, value string) (updated bool, err error) {
