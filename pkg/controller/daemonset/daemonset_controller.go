@@ -954,7 +954,7 @@ func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsTo
 			if details, err := json.Marshal(newCheckDetails); err == nil {
 				_, err = dsc.UpdatePodAnnotation(pod, string(appspub.DaemonSetPrecheckHookCheckDetailsKey), string(details))
 				if err != nil {
-					klog.V(3).Infof("DaemonSet %s/%s fail to update probe details %v", ds.Namespace, ds.Name, err)
+					klog.V(3).Infof("DaemonSet %s/%s fail to update probe details %v: %s", ds.Namespace, ds.Name, err, string(details))
 				}
 			} else {
 				klog.V(3).Infof("DaemonSet %s/%s fail to generate probe details %v", ds.Namespace, ds.Name, err)

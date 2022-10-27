@@ -140,7 +140,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 				if details, err := json.Marshal(newCheckDetails); err == nil {
 					_, err = dsc.UpdatePodAnnotation(newPod, string(appspub.DaemonSetPostcheckHookCheckDetailsKey), string(details))
 					if err != nil {
-						klog.V(3).Infof("DaemonSet %s/%s fail to update probe details %v", ds.Namespace, ds.Name, err)
+						klog.V(3).Infof("DaemonSet %s/%s fail to update probe details %v: %s", ds.Namespace, ds.Name, err, string(details))
 					}
 				} else {
 					klog.V(3).Infof("DaemonSet %s/%s fail to generate probe details %v", ds.Namespace, ds.Name, err)
