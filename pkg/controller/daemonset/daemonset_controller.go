@@ -229,7 +229,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 
 			// check DeploymentPaused
-			if DeploymentPaused, found := newDS.Annotations["DeploymentPaused"]; found {
+			if DeploymentPaused, found := newDS.Annotations[string(appspub.DaemonSetDeploymentPausedKey)]; found {
 				if DeploymentPaused == "true" {
 					klog.V(4).Infof("DaemonSet %s/%s is paused, skip update", newDS.Namespace, newDS.Name)
 					return false
@@ -895,7 +895,7 @@ func (dsc *ReconcileDaemonSet) syncWithPreparingDelete(ds *appsv1alpha1.DaemonSe
 func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsToDelete []string) (podsCanDelete []string, err error) {
 	// get hooks from deamonset, use default hook
 	hooks := map[string]string{
-		"Precheck": "",
+		appspub.DaemonSetPrecheckHookKey: "",
 		//"DeviceLock": "",
 	}
 	for _, podName := range podsToDelete {
@@ -913,8 +913,8 @@ func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsTo
 
 			if !found {
 				klog.V(3).Infof("DaemonSet %s/%s hook %v is not found for pod %v", ds.Namespace, ds.Name, hk, podName)
-				dsc.UpdatePodAnnotation(pod, "PostCheck", "")
-				dsc.UpdatePodAnnotation(pod, hk, "Pending")
+				dsc.UpdatePodAnnotation(pod, appspub.DaemonSetPostcheckHookKey, "")
+				dsc.UpdatePodAnnotation(pod, hk, string(appspub.DaemonSetHookStatePending))
 				dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPreCheckPending", fmt.Sprintf("The pod %v update is pending for precheck now.", podName))
 				continue
 			} else {

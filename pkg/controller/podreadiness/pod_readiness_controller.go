@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
 	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	apps "k8s.io/api/apps/v1"
@@ -156,21 +157,31 @@ func (r *ReconcilePodReadiness) Reconcile(_ context.Context, request reconcile.R
 		}
 
 		// check precheck hook
-		if precheck, prechckFound := pod.Annotations["PreCheck"]; prechckFound {
-			if !strings.EqualFold(precheck, "completed") {
-				r.doCheck(pod, "PreCheck")
+		if precheck, prechckFound := pod.Annotations[string(appspub.DaemonSetPrecheckHookKey)]; prechckFound {
+			if !strings.EqualFold(precheck, string(appspub.DaemonSetHookStateCompleted)) {
+				precheckErr := r.doCheck(pod, string(appspub.DaemonSetPrecheckHookKey))
+				if precheckErr != nil {
+					return precheckErr
+				}
 			}
-
 		}
 
-		if postcheck, postchckFound := pod.Annotations["PostCheck"]; postchckFound {
-			if !strings.EqualFold(postcheck, "completed") {
-				r.doCheck(pod, "PostCheck")
+		// check postcheck hook
+		if postcheck, postchckFound := pod.Annotations[string(appspub.DaemonSetPostcheckHookKey)]; postchckFound {
+			if !strings.EqualFold(postcheck, string(appspub.DaemonSetHookStateCompleted)) {
+				postcheckErr := r.doCheck(pod, string(appspub.DaemonSetPostcheckHookKey))
+				if postcheckErr != nil {
+					return postcheckErr
+				}
 			}
 		}
 
 		return nil
 	})
+
+	if err != nil {
+		return reconcile.Result{RequeueAfter: time.Duration(30) * time.Minute}, err
+	}
 	return reconcile.Result{}, err
 }
 
@@ -179,7 +190,7 @@ func (r *ReconcilePodReadiness) doCheck(pod *v1.Pod, checkType string) error {
 	// sleep 10 second and make check completed
 	klog.V(4).Infof("%s for pod %s/%s is started", checkType, pod.Namespace, pod.Name)
 	time.Sleep(time.Duration(10) * time.Second)
-	r.updatePodAnnotation(pod, checkType, "completed")
+	r.updatePodAnnotation(pod, checkType, string(appspub.DaemonSetHookStateCompleted))
 	ds, err := r.getPodDaemonSets(pod)
 	if err == nil {
 		r.eventRecorder.Eventf(ds, v1.EventTypeNormal, fmt.Sprintf("Pod%sSuccess", checkType), fmt.Sprintf("The %v for pod %v was completed.", checkType, pod.Name))
@@ -190,18 +201,18 @@ func (r *ReconcilePodReadiness) doCheck(pod *v1.Pod, checkType string) error {
 }
 
 func (r *ReconcilePodReadiness) checkCondition(pod *v1.Pod) bool {
-	if _, hookCheckerEnabled := pod.Annotations["hookCheckerEnabled"]; !hookCheckerEnabled {
-		klog.V(4).Infof("No hookCheckerEnabled for pod %s/%s, skip", pod.Namespace, pod.Name)
+	if _, hookCheckerEnabled := pod.Annotations[string(appspub.DaemonSetHookCheckerEnabledKey)]; !hookCheckerEnabled {
+		klog.V(4).Infof("No %s for pod %s/%s, skip", string(appspub.DaemonSetHookCheckerEnabledKey), pod.Namespace, pod.Name)
 		return false
 	}
 
-	precheck, prechckFound := pod.Annotations["PreCheck"]
-	postcheck, postchckFound := pod.Annotations["PostCheck"]
+	precheck, prechckFound := pod.Annotations[string(appspub.DaemonSetPrecheckHookKey)]
+	postcheck, postchckFound := pod.Annotations[string(appspub.DaemonSetPostcheckHookKey)]
 	if !prechckFound && !postchckFound {
 		return false
 	}
 
-	if !strings.EqualFold(precheck, "Pending") && !strings.EqualFold(postcheck, "Pending") {
+	if !strings.EqualFold(precheck, string(appspub.DaemonSetHookStatePending)) && !strings.EqualFold(postcheck, string(appspub.DaemonSetHookStatePending)) {
 		klog.V(4).Infof("No pending hook for pod %s/%s, skip", pod.Namespace, pod.Name)
 		return false
 	}
