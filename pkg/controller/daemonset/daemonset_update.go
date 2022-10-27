@@ -17,6 +17,7 @@ limitations under the License.
 package daemonset
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -87,27 +88,57 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 
 		// check if the new pod has postcheck tag
 		postCheckPassed := false
+		postcheckPending := false
 		if newPod != nil {
-			postcheckPending := false
+			msg := fmt.Sprintf("Post check for %v", newPod.Spec.Containers[0].Image)
+			newCheckDetails := &appspub.DaemonSetHookDetails{Type: "PostCheck", Message: msg}
+			oldCheckDetails := &appspub.DaemonSetHookDetails{Type: "PostCheck", Message: msg}
+			if postCheckDetailsStr, detailFound := newPod.Annotations[string(appspub.DaemonSetPostcheckHookCheckDetailsKey)]; detailFound {
+				details := appspub.DaemonSetHookDetails{}
+				if err = json.Unmarshal([]byte(postCheckDetailsStr), &details); err == nil {
+					oldCheckDetails = &details
+				}
+			}
 			postCheck, found := newPod.Annotations[string(appspub.DaemonSetPostcheckHookKey)]
 			klog.V(3).Infof("DaemonSet %s/%s ,new pod %v found, postcheck %v ", ds.Namespace, ds.Name, newPod.Name, postCheck)
 			if found {
 				if strings.EqualFold(postCheck, string(appspub.DaemonSetHookStateCompleted)) {
+					newCheckDetails.Status = string(appspub.DaemonSetHookStateCompleted)
 					postCheckPassed = true
-					dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPostCheckSuccess", fmt.Sprintf("Postcheck for pod %v was completed.", newPod.Name))
+					if newCheckDetails.Status != oldCheckDetails.Status {
+						dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPostCheck", fmt.Sprintf("Postcheck for pod %v on node %v was completed.", newPod.Name, nodeName))
+					}
 					klog.V(3).Infof("DaemonSet %s/%s ,pod %v on node %v Postcheck is done", ds.Namespace, ds.Name, newPod.Name, nodeName)
 				} else if strings.EqualFold(postCheck, string(appspub.DaemonSetHookStateFailed)) {
-					dsc.eventRecorder.Eventf(ds, corev1.EventTypeWarning, "PodPostCheckFailure", fmt.Sprintf("This DaemonSet update is paused due to pod %v postcheck failure on node %v.", newPod.Name, nodeName))
+					newCheckDetails.Status = string(appspub.DaemonSetHookStateFailed)
+					if newCheckDetails.Status != oldCheckDetails.Status {
+						dsc.eventRecorder.Eventf(ds, corev1.EventTypeWarning, "PodPostCheck", fmt.Sprintf("Postcheck for pod %v on node %v was failed. The DaemonSet update will be paused.", newPod.Name, nodeName))
+					}
 					// any failure on postcheck will make ds paused
 					klog.V(3).Infof("DaemonSet %s/%s is paused due to Postcheck failed on pod %v on node %v", ds.Namespace, ds.Name, newPod.Name, nodeName)
 					dsc.UpdateDsAnnotation(ds, string(appspub.DaemonSetDeploymentPausedKey), "true")
 				} else if !strings.EqualFold(postCheck, string(appspub.DaemonSetHookStatePending)) {
 					postcheckPending = true
+					newCheckDetails.Status = string(appspub.DaemonSetHookStatePending)
 				}
 			}
 			if !found || postcheckPending {
+				if !found {
+					// clean precheck
+					dsc.UpdatePodAnnotation(newPod, appspub.DaemonSetPrecheckHookKey, "")
+				}
 				dsc.UpdatePodAnnotation(newPod, string(appspub.DaemonSetPostcheckHookKey), string(appspub.DaemonSetHookStatePending))
-				dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPostCheckPending", fmt.Sprintf("The pod %v was updated on node %v, and is pending for postcheck now.", newPod.Name, nodeName))
+				if newCheckDetails.Status != oldCheckDetails.Status {
+					dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPostCheck", fmt.Sprintf("Postcheck for pod %v on node %v is pending now.", newPod.Name, nodeName))
+				}
+			}
+
+			// update probe details
+			if newCheckDetails.Status == string(appspub.DaemonSetHookStatePending) || newCheckDetails.Status != oldCheckDetails.Status {
+				newCheckDetails.LastProbeTime = metav1.Now()
+				if details, err := json.Marshal(newCheckDetails); err == nil {
+					dsc.UpdateDsAnnotation(ds, string(appspub.DaemonSetPostcheckHookCheckDetailsKey), string(details))
+				}
 			}
 		}
 		switch {

@@ -18,6 +18,7 @@ package podreadiness
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -52,6 +53,7 @@ import (
 
 var (
 	concurrentReconciles = 3
+	controllerKind       = apps.SchemeGroupVersion.WithKind("DaemonSet")
 )
 
 func Add(mgr manager.Manager) error {
@@ -196,11 +198,31 @@ func (r *ReconcilePodReadiness) doCheck(pod *v1.Pod, checkType string) error {
 		r.eventRecorder.Eventf(ds, v1.EventTypeNormal, fmt.Sprintf("Pod%sSuccess", checkType), fmt.Sprintf("The %v for pod %v was completed.", checkType, pod.Name))
 	}
 
+	// update probe details
+	msg := fmt.Sprintf("%v for %v", checkType, pod.Spec.Containers[0].Image)
+	newCheckDetails := &appspub.DaemonSetHookDetails{Type: checkType, Message: msg}
+
+	newCheckDetails.LastProbeTime = metav1.Now()
+	if details, err := json.Marshal(newCheckDetails); err == nil {
+		if checkType == string(appspub.DaemonSetPrecheckHookKey) {
+			r.updatePodAnnotation(pod, string(appspub.DaemonSetPrecheckHookCheckDetailsKey), string(details))
+		} else if checkType == string(appspub.DaemonSetPostcheckHookKey) {
+			r.updatePodAnnotation(pod, string(appspub.DaemonSetPostcheckHookCheckDetailsKey), string(details))
+		}
+	}
+
 	klog.V(4).Infof("%s for pod %s/%s is completed", checkType, pod.Namespace, pod.Name)
 	return nil
 }
 
 func (r *ReconcilePodReadiness) checkCondition(pod *v1.Pod) bool {
+	// only care the pod in ds
+	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
+		if controllerRef.Kind != controllerKind.Kind || controllerRef.APIVersion != controllerKind.GroupVersion().String() {
+			return false
+		}
+	}
+
 	if _, hookCheckerEnabled := pod.Annotations[string(appspub.DaemonSetHookCheckerEnabledKey)]; !hookCheckerEnabled {
 		klog.V(4).Infof("No %s for pod %s/%s, skip", string(appspub.DaemonSetHookCheckerEnabledKey), pod.Namespace, pod.Name)
 		return false

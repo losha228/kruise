@@ -16,10 +16,16 @@ limitations under the License.
 
 package pub
 
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 const (
-	DaemonSetPrecheckHookKey       = "hook.daemonset.sonic/precheck"
-	DaemonSetPostcheckHookKey      = "hook.daemonset.sonic/postcheck"
-	DaemonSetHookCheckerEnabledKey = "hook.daemonset.sonic/hook-checker-enabled"
+	DaemonSetPrecheckHookKey              = "hook.daemonset.sonic/precheck"
+	DaemonSetPrecheckHookCheckDetailsKey  = "hook.daemonset.sonic/precheck-check-details"
+	DaemonSetPrecheckHookProbeDetailsKey  = "hook.daemonset.sonic/precheck-probe-details"
+	DaemonSetPostcheckHookKey             = "hook.daemonset.sonic/postcheck"
+	DaemonSetPostcheckHookCheckDetailsKey = "hook.daemonset.sonic/postcheck-check-details"
+	DaemonSetPostcheckHookProbeDetailsKey = "hook.daemonset.sonic/postcheck-probe-details"
+	DaemonSetHookCheckerEnabledKey        = "hook.daemonset.sonic/hook-checker-enabled"
 
 	DaemonSetHookStatePending   DaemonsetHookStateType = "pending"
 	DaemonSetHookStateCompleted DaemonsetHookStateType = "completed"
@@ -29,3 +35,24 @@ const (
 )
 
 type DaemonsetHookStateType string
+
+type DaemonSetHookDetails struct {
+	// Type is the type of the condition.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
+	Type string `json:"type"`
+
+	// precheck probe result, true or false.
+	Result bool `json:"result,omitempty"`
+
+	// Last time we probed the condition.
+	// +optional
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+
+	// hook status.
+	// +optional
+	Status string `json:"status,omitempty"`
+
+	// Human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty"`
+}
