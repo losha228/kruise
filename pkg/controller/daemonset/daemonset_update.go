@@ -125,6 +125,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 			}
 			if !found || postcheckPending {
 				if !found {
+					newCheckDetails.Status = string(appspub.DaemonSetHookStatePending)
 					// clean precheck
 					dsc.UpdatePodAnnotation(newPod, string(appspub.DaemonSetPrecheckHookKey), "")
 				}

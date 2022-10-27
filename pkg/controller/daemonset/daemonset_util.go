@@ -208,11 +208,12 @@ func (dsc *ReconcileDaemonSet) UpdateProbeDetails(pod *corev1.Pod, key, value st
 
 	// re-marchal the string to escape
 	newStr, _ := json.Marshal(value)
-
+	result := strings.ReplaceAll(string(newStr), "}", "\\}")
+	result = strings.ReplaceAll(result, "{", "\\{")
 	body := fmt.Sprintf(
 		`{"metadata":{"annotations":{"%s":"%s"}}}`,
 		key,
-		string(newStr))
+		result)
 
 	err = dsc.podControl.PatchPod(pod.Namespace, pod.Name, []byte(body))
 
