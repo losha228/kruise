@@ -31,6 +31,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
+	clientset "k8s.io/client-go/kubernetes"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -199,7 +200,7 @@ func (dsc *ReconcileDaemonSet) UpdatePodAnnotation(pod *corev1.Pod, key, value s
 	return true, err
 }
 
-func (dsc *ReconcileDaemonSet) UpdateProbeDetails(pod *corev1.Pod, key string, details *appspub.DaemonSetHookDetails) (updated bool, err error) {
+func UpdateProbeDetails(kubeClient clientset.Interface, pod *corev1.Pod, key string, details *appspub.DaemonSetHookDetails) (updated bool, err error) {
 	if pod == nil {
 		return false, nil
 	}
@@ -222,11 +223,30 @@ func (dsc *ReconcileDaemonSet) UpdateProbeDetails(pod *corev1.Pod, key string, d
 		key,
 		string(dataStr))
 
-	err = dsc.podControl.PatchPod(pod.Namespace, pod.Name, []byte(body))
+	_, err = kubeClient.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, []byte(body), metav1.PatchOptions{})
 	if err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+func LoadProbeDetails(pod *corev1.Pod, key string) (details *appspub.DaemonSetHookDetails, err error) {
+	if pod == nil {
+		return nil, fmt.Errorf("pod is nil")
+	}
+
+	if statusDetailStr, detailFound := pod.Annotations[key]; detailFound {
+		statusDetail := &appspub.DaemonSetHookDetails{}
+		err := json.Unmarshal([]byte(statusDetailStr), statusDetail)
+		if err == nil {
+			return statusDetail, nil
+		} else {
+			return nil, err
+		}
+	}
+
+	// not found
+	return nil, nil
 }
 
 func (dsc *ReconcileDaemonSet) UpdateDsAnnotation(ds *apps.DaemonSet, key, value string) (updated bool, err error) {

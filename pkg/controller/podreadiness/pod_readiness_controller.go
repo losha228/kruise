@@ -192,23 +192,20 @@ func (r *ReconcilePodReadiness) doCheck(pod *v1.Pod, checkType string) error {
 	// sleep 10 second and make check completed
 	klog.V(4).Infof("%s for pod %s/%s is started", checkType, pod.Namespace, pod.Name)
 	time.Sleep(time.Duration(10) * time.Second)
-	r.updatePodAnnotation(pod, checkType, string(appspub.DaemonSetHookStateCompleted))
+	msg := fmt.Sprintf("%v for %v", checkType, pod.Spec.Containers[0].Image)
+	newCheckDetails := &appspub.DaemonSetHookDetails{Type: checkType, Message: msg, Status: string(appspub.DaemonSetHookStateCompleted)}
+	newCheckDetails.LastProbeTime = metav1.Now()
+	detailKey := ""
+	if checkType == string(appspub.DaemonSetPrecheckHookKey) {
+		detailKey = string(appspub.DaemonSetPrecheckHookProbeDetailsKey)
+	} else if checkType == string(appspub.DaemonSetPostcheckHookKey) {
+		detailKey = string(appspub.DaemonSetPostcheckHookProbeDetailsKey)
+	}
+
+	r.updatePodAnnotation(pod, checkType, string(appspub.DaemonSetHookStateCompleted), detailKey, newCheckDetails)
 	ds, err := r.getPodDaemonSets(pod)
 	if err == nil {
 		r.eventRecorder.Eventf(ds, v1.EventTypeNormal, fmt.Sprintf("Pod%sSuccess", checkType), fmt.Sprintf("The %v for pod %v was completed.", checkType, pod.Name))
-	}
-
-	// update probe details
-	msg := fmt.Sprintf("%v for %v", checkType, pod.Spec.Containers[0].Image)
-	newCheckDetails := &appspub.DaemonSetHookDetails{Type: checkType, Message: msg}
-
-	newCheckDetails.LastProbeTime = metav1.Now()
-	if details, err := json.Marshal(newCheckDetails); err == nil {
-		if checkType == string(appspub.DaemonSetPrecheckHookKey) {
-			r.updatePodAnnotation(pod, string(appspub.DaemonSetPrecheckHookProbeDetailsKey), string(details))
-		} else if checkType == string(appspub.DaemonSetPostcheckHookKey) {
-			r.updatePodAnnotation(pod, string(appspub.DaemonSetPostcheckHookProbeDetailsKey), string(details))
-		}
 	}
 
 	klog.V(4).Infof("%s for pod %s/%s is completed", checkType, pod.Namespace, pod.Name)
@@ -241,17 +238,30 @@ func (r *ReconcilePodReadiness) checkCondition(pod *v1.Pod) bool {
 	return true
 }
 
-func (r *ReconcilePodReadiness) updatePodAnnotation(pod *v1.Pod, key, value string) (updated bool, err error) {
+func (r *ReconcilePodReadiness) updatePodAnnotation(pod *v1.Pod, key, value, detailsKey string, details *appspub.DaemonSetHookDetails) (updated bool, err error) {
 	if pod == nil {
 		return false, nil
 	}
 
 	pod = pod.DeepCopy()
 
+	dataStr, err := json.Marshal(details)
+	if err != nil {
+		return false, err
+	}
+
+	// escape the ""
+	detailStr, err := json.Marshal(string(dataStr))
+	if err != nil {
+		return false, err
+	}
+
 	body := fmt.Sprintf(
-		`{"metadata":{"annotations":{"%s":"%s"}}}`,
+		`{"metadata":{"annotations":{"%s":"%s", "%s": %s }}}`,
 		key,
-		value)
+		value,
+		detailsKey,
+		string(detailStr))
 
 	r.kubeClient.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, []byte(body), metav1.PatchOptions{})
 
