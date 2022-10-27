@@ -29,6 +29,7 @@ import (
 	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
+	"github.com/openkruise/kruise/vendor/k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apps "k8s.io/api/apps/v1"
@@ -205,6 +206,15 @@ func (dsc *ReconcileDaemonSet) UpdateProbeDetails(pod *corev1.Pod, key, value st
 
 	pod = pod.DeepCopy()
 
+	data := &appspub.DaemonSetHookDetails{}
+	data.Status = "pending"
+	data.LastProbeTime = metav1.Now()
+	data.Type = "Postcheck"
+	data.Message = "test"
+
+	dataStr, _ := json.Marshal(&data)
+	output, _ := json.Marshal(string(dataStr))
+
 	// re-marchal the string to escape
 	/*
 		newStr, _ := json.Marshal(value)
@@ -212,9 +222,9 @@ func (dsc *ReconcileDaemonSet) UpdateProbeDetails(pod *corev1.Pod, key, value st
 		result = strings.ReplaceAll(result, "{", "\\{")
 	*/
 	body := fmt.Sprintf(
-		`{"metadata":{"annotations":{"%s":"{\"%s\":\"%s\"}"}}}`,
+		`{"metadata":{"annotations":{"%s": %s}}}`,
 		key,
-		"team", "ipam")
+		string(output))
 
 	err = dsc.podControl.PatchPod(pod.Namespace, pod.Name, []byte(body))
 
