@@ -88,10 +88,8 @@ func (dsc *ReconcileDaemonSet) rollingUpdate2(ds *apps.DaemonSet, nodeList []*co
 		// check if the new pod has postcheck tag
 		postCheckPassed := false
 		postcheckPending := false
-
+		klog.V(3).Infof("DaemonSet %s/%s ,new pod %v found on node %v, start postcheck", ds.Namespace, ds.Name, newPod.Name, nodeName)
 		postCheck, found := newPod.Annotations[string(appspub.DaemonSetPostcheckHookKey)]
-
-		klog.V(3).Infof("DaemonSet %s/%s ,new pod %v found, postcheck %v ", ds.Namespace, ds.Name, newPod.Name, postCheck)
 		if found {
 
 			if strings.EqualFold(postCheck, string(appspub.DaemonSetHookStateCompleted)) {
