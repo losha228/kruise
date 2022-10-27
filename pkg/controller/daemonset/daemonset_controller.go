@@ -910,7 +910,12 @@ func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsTo
 		msg := fmt.Sprintf("Pre check for updating %v", pod.Spec.Containers[0].Image)
 		newCheckDetails := &appspub.DaemonSetHookDetails{Type: "PreCheck", Message: msg}
 		oldCheckDetails := &appspub.DaemonSetHookDetails{Type: "PreCheck", Message: msg}
-
+		if preCheckDetailsStr, detailFound := pod.Annotations[string(appspub.DaemonSetPrecheckHookCheckDetailsKey)]; detailFound {
+			details := appspub.DaemonSetHookDetails{}
+			if err = json.Unmarshal([]byte(preCheckDetailsStr), &details); err == nil {
+				oldCheckDetails = &details
+			}
+		}
 		verifiedValue := 0
 		for hk, _ := range hooks {
 			klog.V(3).Infof("DaemonSet %s/%s check hook %v for pod %v", ds.Namespace, ds.Name, hk, podName)
@@ -920,7 +925,7 @@ func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsTo
 				newCheckDetails.Status = string(appspub.DaemonSetHookStatePending)
 				klog.V(3).Infof("DaemonSet %s/%s hook %v is not found for pod %v", ds.Namespace, ds.Name, hk, podName)
 				// clean post check
-				dsc.UpdatePodAnnotation(pod, appspub.DaemonSetPostcheckHookKey, "")
+				dsc.UpdatePodAnnotation(pod, string(appspub.DaemonSetPostcheckHookKey), "")
 				dsc.eventRecorder.Eventf(ds, corev1.EventTypeNormal, "PodPreCheckPending", fmt.Sprintf("The pod %v update is pending for precheck now.", podName))
 				continue
 			} else {
@@ -947,6 +952,8 @@ func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsTo
 			newCheckDetails.LastProbeTime = metav1.Now()
 			if details, err := json.Marshal(newCheckDetails); err == nil {
 				dsc.UpdateDsAnnotation(ds, string(appspub.DaemonSetPrecheckHookCheckDetailsKey), string(details))
+			} else {
+				klog.V(3).Infof("DaemonSet %s/%s fail to generate probe details %v", ds.Namespace, ds.Name, err)
 			}
 		}
 		if verifiedValue >= len(hooks) {
