@@ -313,15 +313,15 @@ func surgeCount(ds *apps.DaemonSet, numberToSchedule int) (int, error) {
 // unavailableCount returns 0 if unavailability is not requested, the expected
 // unavailability number to allow out of numberToSchedule if requested, or an error if
 // the unavailability percentage requested is invalid.
-func unavailableCount(ds *appsv1alpha1.DaemonSet, numberToSchedule int) (int, error) {
+func unavailableCount(ds *apps.DaemonSet, numberToSchedule int) (int, error) {
 	var maxUnavailable *intstr.IntOrString
 	maxUnavailableInAnnotations, found := ds.Annotations["roolingupdate.daemonset.sonic/max-unavailable"]
 
-	if found && ds.Spec.UpdateStrategy.Type == appsv1alpha1.OnDeleteDaemonSetStrategyType {
+	if found && ds.Spec.UpdateStrategy.Type == apps.OnDeleteDaemonSetStrategyType {
 		v := intstr.FromString(maxUnavailableInAnnotations)
 		maxUnavailable = &v
 	} else {
-		if ds.Spec.UpdateStrategy.Type != appsv1alpha1.RollingUpdateDaemonSetStrategyType {
+		if ds.Spec.UpdateStrategy.Type != apps.RollingUpdateDaemonSetStrategyType {
 			return 0, nil
 		}
 		r := ds.Spec.UpdateStrategy.RollingUpdate

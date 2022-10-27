@@ -375,7 +375,7 @@ func (dsc *ReconcileDaemonSet) updatedDesiredNodeCounts(ds *apps.DaemonSet, node
 		}
 	}
 
-	maxUnavailable, err := unavailableCount(nil, desiredNumberScheduled)
+	maxUnavailable, err := unavailableCount(ds, desiredNumberScheduled)
 	if err != nil {
 		return -1, -1, fmt.Errorf("invalid value for MaxUnavailable: %v", err)
 	}
