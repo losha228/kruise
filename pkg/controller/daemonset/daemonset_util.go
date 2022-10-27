@@ -189,7 +189,7 @@ func (dsc *ReconcileDaemonSet) UpdatePodAnnotation(pod *corev1.Pod, key, value s
 	pod = pod.DeepCopy()
 
 	body := fmt.Sprintf(
-		`{"metadata":{"annotations":{"%s":"%s"}}}`,
+		`{"metadata":{"annotations":{"%s":'%s'}}}`,
 		key,
 		value)
 
