@@ -920,7 +920,7 @@ func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsTo
 		for hk, _ := range hooks {
 			klog.V(3).Infof("DaemonSet %s/%s check hook %v for pod %v", ds.Namespace, ds.Name, hk, podName)
 			precheckValue, found := pod.Annotations[hk]
-
+			oldCheckDetails.Status = precheckValue
 			if !found {
 				newCheckDetails.Status = string(appspub.DaemonSetHookStatePending)
 				klog.V(3).Infof("DaemonSet %s/%s hook %v is not found for pod %v", ds.Namespace, ds.Name, hk, podName)
@@ -952,7 +952,7 @@ func (dsc *ReconcileDaemonSet) syncWithPreDeleteHooks(ds *apps.DaemonSet, podsTo
 			klog.V(3).Infof("DaemonSet %s/%s update probe details for pod %v", ds.Namespace, ds.Name, podName)
 			newCheckDetails.LastProbeTime = metav1.Now()
 			if details, err := json.Marshal(newCheckDetails); err == nil {
-				_, err = dsc.UpdatePodAnnotation(pod, string(appspub.DaemonSetPrecheckHookCheckDetailsKey), string(details))
+				_, err = dsc.UpdateProbeDetails(pod, string(appspub.DaemonSetPrecheckHookCheckDetailsKey), string(details))
 				if err != nil {
 					klog.V(3).Infof("DaemonSet %s/%s fail to update probe details %v: %s", ds.Namespace, ds.Name, err, string(details))
 				}

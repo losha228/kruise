@@ -18,6 +18,7 @@ package daemonset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -189,9 +190,29 @@ func (dsc *ReconcileDaemonSet) UpdatePodAnnotation(pod *corev1.Pod, key, value s
 	pod = pod.DeepCopy()
 
 	body := fmt.Sprintf(
-		`{"metadata":{"annotations":{"%s":"\"%s\""}}}`,
+		`{"metadata":{"annotations":{"%s":"%s"}}}`,
 		key,
 		value)
+
+	err = dsc.podControl.PatchPod(pod.Namespace, pod.Name, []byte(body))
+
+	return true, err
+}
+
+func (dsc *ReconcileDaemonSet) UpdateProbeDetails(pod *corev1.Pod, key, value string) (updated bool, err error) {
+	if pod == nil {
+		return false, nil
+	}
+
+	pod = pod.DeepCopy()
+
+	// re-marchal the string to escape
+	newStr, _ := json.Marshal(value)
+
+	body := fmt.Sprintf(
+		`{"metadata":{"annotations":{"%s":"%s"}}}`,
+		key,
+		string(newStr))
 
 	err = dsc.podControl.PatchPod(pod.Namespace, pod.Name, []byte(body))
 
