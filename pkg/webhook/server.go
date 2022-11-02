@@ -26,13 +26,12 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	webhookcontroller "github.com/openkruise/kruise/pkg/webhook/util/controller"
 	"github.com/openkruise/kruise/pkg/webhook/util/health"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 type GateFunc func() (enabled bool)
@@ -86,20 +85,25 @@ func SetupWithManager(mgr manager.Manager) error {
 	server.Host = "0.0.0.0"
 	server.Port = webhookutil.GetPort()
 	server.CertDir = webhookutil.GetCertDir()
-
-	// register admission handlers
-	filterActiveHandlers()
 	for path, handler := range HandlerMap {
 		server.Register(path, &webhook.Admission{Handler: handler})
 		klog.V(3).Infof("Registered webhook handler %s", path)
 	}
 
-	// register conversion webhook
-	server.Register("/convert", &conversion.Webhook{})
+	/*
+		// register admission handlers
+		filterActiveHandlers()
+		for path, handler := range HandlerMap {
+			server.Register(path, &webhook.Admission{Handler: handler})
+			klog.V(3).Infof("Registered webhook handler %s", path)
+		}
 
-	// register health handler
-	server.Register("/healthz", &health.Handler{})
+		// register conversion webhook
+		server.Register("/convert", &conversion.Webhook{})
 
+		// register health handler
+		server.Register("/healthz", &health.Handler{})
+	*/
 	return nil
 }
 

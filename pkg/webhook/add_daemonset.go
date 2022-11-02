@@ -17,11 +17,11 @@ limitations under the License.
 package webhook
 
 import (
-	"github.com/openkruise/kruise/pkg/webhook/daemonset/mutating"
+	// "github.com/openkruise/kruise/pkg/webhook/daemonset/mutating"
 	"github.com/openkruise/kruise/pkg/webhook/daemonset/validating"
 )
 
 func init() {
-	addHandlers(mutating.HandlerMap)
+	// addHandlers(mutating.HandlerMap)
 	addHandlers(validating.HandlerMap)
 }
